@@ -1088,7 +1088,7 @@
             }
         }
         
-        // FIXED: Daily Profit Calculation - CORRECTED
+        // FIXED: Daily Profit Calculation - Correct 10% per deposit
         async function processUserEarnings(uid, userDataSnapshot = null) {
             const userDataToProcess = userDataSnapshot || userData;
             if (!userDataToProcess) return 0;
@@ -1105,13 +1105,13 @@
             
             let totalEarnings = 0;
             let updated = false;
-            let daysPaidMessage = [];
+            let depositsPaid = [];
             
             console.log('═══════════════════════════════════════');
             console.log(`📅 TODAY: ${today.toDateString()}`);
             console.log('═══════════════════════════════════════');
             
-            const updatedDeposits = activeDeposits.map(deposit => {
+            const updatedDeposits = activeDeposits.map((deposit, index) => {
                 // Get deposit date from timestamp
                 const depositDate = new Date(deposit.date);
                 depositDate.setHours(0, 0, 0, 0);
@@ -1124,19 +1124,17 @@
                 // Get last earning day (default to 0)
                 const lastEarningDay = deposit.lastEarningDay || 0;
                 
-                // Calculate days to pay (from last paid day up to today)
-                // Note: lastEarningDay = last day that was paid
-                // Example: if deposit on Day 0, lastEarningDay=1 means Day 1 was paid
-                // So next day to pay is Day 2
+                // Calculate days to pay
                 const daysToPay = Math.max(0, daysSinceDeposit - lastEarningDay);
                 
-                console.log(`\n💰 DEPOSIT: ${formatMoney(deposit.amount)}`);
+                console.log(`\n💰 DEPOSIT ${index + 1}: ${formatMoney(deposit.amount)}`);
                 console.log(`   Deposit date: ${depositDate.toDateString()}`);
                 console.log(`   Days since deposit: ${daysSinceDeposit}`);
-                console.log(`   Last earning day paid: ${lastEarningDay}`);
+                console.log(`   Last earning day: ${lastEarningDay}`);
                 console.log(`   Days to pay today: ${daysToPay}`);
                 
                 if (daysToPay > 0 && daysSinceDeposit > 0 && daysSinceDeposit <= 60) {
+                    // Calculate 10% of THIS deposit amount
                     const dailyAmount = deposit.amount * 0.1;
                     const earningsForDeposit = dailyAmount * daysToPay;
                     totalEarnings += earningsForDeposit;
@@ -1145,11 +1143,10 @@
                     deposit.earnedSoFar = (deposit.earnedSoFar || 0) + earningsForDeposit;
                     updated = true;
                     
-                    daysPaidMessage.push(`${daysToPay} day(s) on ${formatMoney(deposit.amount)} deposit`);
+                    depositsPaid.push(`${formatMoney(deposit.amount)} deposit: +${formatMoney(earningsForDeposit)} (${daysToPay} day(s))`);
                     console.log(`   ✅ ADDED: ${formatMoney(earningsForDeposit)} (${daysToPay} day(s) × ${formatMoney(dailyAmount)})`);
-                    console.log(`   New lastEarningDay: ${daysSinceDeposit}`);
                 } else {
-                    console.log(`   ❌ No profit added. Days to pay: ${daysToPay}, Days since: ${daysSinceDeposit}, Max days: 60`);
+                    console.log(`   ❌ No profit added`);
                 }
                 
                 return deposit;
@@ -1174,8 +1171,8 @@
                 });
                 
                 console.log('\n═══════════════════════════════════════');
-                console.log(`🎉 PROFIT ADDED: ${formatMoney(totalEarnings)}`);
-                console.log(`   Days paid: ${daysPaidMessage.join(', ')}`);
+                console.log(`🎉 TOTAL PROFIT ADDED: ${formatMoney(totalEarnings)}`);
+                depositsPaid.forEach(p => console.log(`   ${p}`));
                 console.log('═══════════════════════════════════════');
                 showBonusNotification(`📈 Daily Profit: +${formatMoney(totalEarnings)}`);
             } else {
@@ -1191,7 +1188,6 @@
             await processUserEarnings(currentUser.uid, userData);
         }
         
-        // FIXED: Check for missed days on login
         async function checkMissedDaysOnLogin() {
             if (!currentUser || !userData) return;
             
@@ -1662,7 +1658,8 @@
                         <div class="table-wrapper">
                             <table class="investment-table">
                                 <thead>
-                                     <tr><th>💰 INVESTMENT</th><th>📈 DAILY</th><th>🏆 TOTAL</th> </thead>
+                                      <tr><th>💰 INVESTMENT</th><th>📈 DAILY</th><th>🏆 TOTAL</th></tr>
+                                </thead>
                                 <tbody>
                                     ${INVESTMENT_PLANS.map(p => `
                                          <tr>
@@ -1672,7 +1669,7 @@
                                          </tr>
                                     `).join('')}
                                 </tbody>
-                             </table>
+                            </table>
                         </div>
                         <div class="action-grid mt-2">
                             <button class="btn btn-secondary" id="closeTable">Close</button>
@@ -1810,7 +1807,7 @@
                                     <tr><td>Level 2</td><td>4%</td><td>${formatMoney(userData?.referralEarnings?.level2 || 0)}</td></tr>
                                     <tr><td>Level 3</td><td>1%</td><td>${formatMoney(userData?.referralEarnings?.level3 || 0)}</td></tr>
                                 </tbody>
-                             </table>
+                            </table>
                         </div>
                         ${referralsList.length > 0 ? `
                             <div class="referral-list">
@@ -2029,7 +2026,7 @@
                 setupActivityListeners();
                 setupAutoRefresh();
                 startTradingUpdates();
-                await checkMissedDaysOnLogin(); // Check for missed days
+                await checkMissedDaysOnLogin();
                 renderFloatingWhatsApp();
             }
             else { 
