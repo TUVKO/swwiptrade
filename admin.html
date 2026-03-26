@@ -1,0 +1,1888 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>SWWIPTRADE - Admin Panel</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: #0A0A0F;
+            color: #fff;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #1E1E2A;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            background: linear-gradient(135deg, #FFB347, #FF8C00);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .admin-badge {
+            background: #FFB347;
+            color: #000;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .logout-btn {
+            background: #DC2626;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 40px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: #111216;
+            border-radius: 20px;
+            padding: 20px;
+            border: 1px solid #1E1E2A;
+        }
+
+        .stat-card .label {
+            font-size: 12px;
+            color: #8E8E93;
+            margin-bottom: 8px;
+        }
+
+        .stat-card .value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #FFD966;
+        }
+
+        .stat-card .sub {
+            font-size: 12px;
+            color: #6B6B76;
+            margin-top: 8px;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .tab-btn {
+            padding: 10px 20px;
+            background: #1E1E2A;
+            border: none;
+            border-radius: 40px;
+            color: #fff;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .tab-btn.active {
+            background: #FFB347;
+            color: #000;
+        }
+
+        .badge-count {
+            background: #FFB347;
+            color: #000;
+            border-radius: 20px;
+            padding: 2px 8px;
+            font-size: 10px;
+            margin-left: 6px;
+        }
+
+        .tab-btn.active .badge-count {
+            background: #000;
+            color: #FFB347;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+            background: #111216;
+            border-radius: 20px;
+            border: 1px solid #1E1E2A;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #1E1E2A;
+        }
+
+        th {
+            color: #FFB347;
+            font-weight: 600;
+            background: #0D0E14;
+        }
+
+        td {
+            font-size: 14px;
+        }
+
+        .search-box {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 16px;
+            border: 1px solid #2A2A35;
+            border-radius: 40px;
+            background: #0D0E14;
+            color: #fff;
+            font-size: 14px;
+        }
+
+        .btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            margin: 2px;
+        }
+
+        .btn-primary {
+            background: #FFB347;
+            color: #000;
+        }
+
+        .btn-danger {
+            background: #DC2626;
+            color: #fff;
+        }
+
+        .btn-success {
+            background: #10B981;
+            color: #fff;
+        }
+
+        .btn-warning {
+            background: #F59E0B;
+            color: #000;
+        }
+
+        .btn-secondary {
+            background: #1E1E2A;
+            color: #fff;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: 0.3s;
+            border-radius: 24px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: 0.3s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #10B981;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        .status-active {
+            background: #10B98120;
+            color: #10B981;
+        }
+
+        .status-locked {
+            background: #DC262620;
+            color: #DC2626;
+        }
+
+        .status-pending {
+            background: #F59E0B20;
+            color: #F59E0B;
+        }
+
+        .status-independent {
+            background: #8B5CF620;
+            color: #8B5CF6;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: #111216;
+            border-radius: 20px;
+            padding: 24px;
+            max-width: 500px;
+            width: 90%;
+            border: 1px solid #1E1E2A;
+        }
+
+        .alert {
+            padding: 12px;
+            border-radius: 12px;
+            margin-bottom: 16px;
+            font-size: 13px;
+        }
+
+        .alert-success {
+            background: rgba(16,185,129,0.15);
+            border: 1px solid #10B981;
+            color: #A7F3D0;
+        }
+
+        .alert-error {
+            background: rgba(220,38,38,0.15);
+            border: 1px solid #DC2626;
+            color: #FECACA;
+        }
+
+        .alert-warning {
+            background: rgba(245,158,11,0.15);
+            border: 1px solid #F59E0B;
+            color: #FDE68A;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #FFB347;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 12px;
+            border: 1px solid #2A2A35;
+            border-radius: 12px;
+            background: #0D0E14;
+            color: #fff;
+            font-size: 14px;
+        }
+
+        .settings-group {
+            margin-bottom: 20px;
+            padding: 16px;
+            background: #0D0E14;
+            border-radius: 16px;
+        }
+
+        .danger-zone {
+            border: 1px solid #DC2626;
+            background: rgba(220, 38, 38, 0.1);
+        }
+
+        .danger-zone h3 {
+            color: #DC2626;
+            margin-bottom: 16px;
+        }
+
+        .danger-btn {
+            background: #DC2626;
+            color: white;
+            margin: 5px;
+            padding: 8px 16px;
+        }
+
+        .danger-btn:hover {
+            background: #B91C1C;
+        }
+
+        .confirm-input {
+            margin-top: 12px;
+            padding: 8px;
+            border: 1px solid #DC2626;
+            background: #1E1E2A;
+            color: white;
+            border-radius: 8px;
+            width: 100%;
+        }
+
+        .whatsapp-preview {
+            background: #25D36620;
+            border: 1px solid #25D366;
+            border-radius: 12px;
+            padding: 12px;
+            margin-top: 12px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .whatsapp-preview a {
+            color: #25D366;
+            text-decoration: none;
+            font-weight: bold;
+            word-break: break-all;
+        }
+        
+        .network-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-size: 10px;
+            font-weight: bold;
+            background: #1E1E2A;
+        }
+        
+        .edit-input {
+            width: 100%;
+            padding: 8px;
+            border-radius: 8px;
+            background: #1E1E2A;
+            border: 1px solid #2A2A35;
+            color: #fff;
+            margin-top: 4px;
+        }
+        
+        .form-group {
+            margin-bottom: 16px;
+        }
+        
+        .form-group label {
+            display: block;
+            font-size: 12px;
+            color: #8E8E93;
+            margin-bottom: 4px;
+        }
+        
+        .toggle-group {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 16px 0;
+        }
+        
+        .threshold-info {
+            background: #1E1E2A;
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 16px;
+            border-left: 4px solid #F59E0B;
+        }
+        
+        .fee-column {
+            color: #EF4444;
+        }
+        
+        .net-column {
+            color: #10B981;
+            font-weight: bold;
+        }
+        
+        .whatsapp-settings-row {
+            margin-bottom: 20px;
+            padding: 12px;
+            background: #0D0E14;
+            border-radius: 12px;
+        }
+        
+        .whatsapp-settings-row label {
+            display: block;
+            font-size: 12px;
+            color: #8E8E93;
+            margin-bottom: 4px;
+        }
+        
+        .whatsapp-settings-row input {
+            margin-bottom: 8px;
+        }
+        
+        .password-field {
+            position: relative;
+        }
+        
+        .password-toggle {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #FFB347;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .referral-list-modal {
+            max-height: 200px;
+            overflow-y: auto;
+            background: #0D0E14;
+            border-radius: 12px;
+            padding: 8px;
+            margin-top: 8px;
+        }
+        
+        .referral-item-modal {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px;
+            border-bottom: 1px solid #1E1E2A;
+            font-size: 12px;
+        }
+        
+        .referral-item-modal:last-child {
+            border-bottom: none;
+        }
+        
+        .small-text {
+            font-size: 11px;
+            color: #8E8E93;
+        }
+        
+        .admin-fee {
+            color: #FFB347;
+            font-weight: bold;
+        }
+        
+        .total-request {
+            color: #10B981;
+            font-weight: bold;
+        }
+        
+        .danger-btn-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        hr {
+            border-color: #2A2A35;
+            margin: 16px 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="container">
+            <div class="loading">Loading Admin Panel...</div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, updatePassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs, deleteDoc, addDoc, increment, arrayUnion, serverTimestamp, onSnapshot, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        
+        const firebaseConfig = {
+            apiKey: "AIzaSyBHid32ayCNww0DOhmHX5tLMlLy49Nep-E",
+            authDomain: "swwiptrade.firebaseapp.com",
+            projectId: "swwiptrade",
+            storageBucket: "swwiptrade.firebasestorage.app",
+            messagingSenderId: "822087763839",
+            appId: "1:822087763839:web:570fd903ff94ec62253c4a"
+        };
+        
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        
+        const ADMIN_USERNAME = "admin";
+        const ADMIN_PASSWORD = "SWWIPTRADE2024";
+        const INDEPENDENT_THRESHOLD = 250000;
+        
+        let currentUser = null;
+        let allUsers = [];
+        let pendingWithdrawals = [];
+        let pendingDeposits = [];
+        let pendingWithdrawalRequests = [];
+        let systemSettings = {
+            withdrawLocked: false,
+            minDeposit: 10000,
+            minWithdraw: 5000,
+            withdrawFee: 10,
+            dailyProfit: 10,
+            whatsappChatLink: "https://wa.me/256784805989",
+            whatsappGroupLink: "https://chat.whatsapp.com/yourgroupinvite",
+            adminCommissionRate: 3.5,
+            adminEarnings: 0,
+            independentThreshold: INDEPENDENT_THRESHOLD
+        };
+        let currentTab = 'dashboard';
+        let notificationPermission = false;
+        let depositListener = null;
+        let withdrawalListener = null;
+        
+        function formatMoney(amount) {
+            return (amount || 0).toLocaleString() + ' UGX';
+        }
+        
+        function showAlert(message, type = 'success') {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type}`;
+            alertDiv.innerText = message;
+            const container = document.querySelector('.container');
+            if (container && container.firstChild) {
+                container.insertBefore(alertDiv, container.firstChild);
+                setTimeout(() => alertDiv.remove(), 3000);
+            }
+        }
+        
+        function playNotificationSound() {
+            const audio = new Audio('https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3');
+            audio.volume = 0.5;
+            audio.play().catch(e => console.log('Audio play failed:', e));
+        }
+        
+        function showBrowserNotification(title, body, icon = 'https://swwiptrade.site/logo.png') {
+            if (notificationPermission && 'Notification' in window) {
+                try {
+                    const notification = new Notification(title, { body, icon });
+                    setTimeout(() => notification.close(), 5000);
+                } catch (e) {
+                    console.log('Notification error:', e);
+                }
+            }
+        }
+        
+        function updateTabTitle(depositCount, withdrawalCount) {
+            const total = depositCount + withdrawalCount;
+            if (total > 0) {
+                document.title = `(${total}) SWWIPTRADE Admin`;
+            } else {
+                document.title = `SWWIPTRADE Admin`;
+            }
+        }
+        
+        function requestNotificationPermission() {
+            if ('Notification' in window) {
+                if (Notification.permission === 'granted') {
+                    notificationPermission = true;
+                } else if (Notification.permission !== 'denied') {
+                    Notification.requestPermission().then(permission => {
+                        notificationPermission = permission === 'granted';
+                    });
+                }
+            }
+        }
+        
+        function setupDepositListener() {
+            if (depositListener) return;
+            
+            depositListener = onSnapshot(collection(db, 'depositRequests'), (snapshot) => {
+                snapshot.docChanges().forEach(async (change) => {
+                    if (change.type === 'added') {
+                        const deposit = change.doc.data();
+                        if (deposit.status === 'pending') {
+                            playNotificationSound();
+                            showBrowserNotification(
+                                '💰 New Deposit Request!',
+                                `${deposit.username} requested ${formatMoney(deposit.amount)} via ${deposit.network || 'MTN'}`,
+                                'https://swwiptrade.site/logo.png'
+                            );
+                            showAlert(`🔔 NEW DEPOSIT: ${deposit.username} - ${formatMoney(deposit.amount)}`, 'success');
+                            await refreshData();
+                        }
+                    }
+                });
+            }, (error) => {
+                console.error('Deposit listener error:', error);
+            });
+        }
+        
+        function setupWithdrawalListener() {
+            if (withdrawalListener) return;
+            
+            withdrawalListener = onSnapshot(collection(db, 'withdrawalRequests'), (snapshot) => {
+                snapshot.docChanges().forEach(async (change) => {
+                    if (change.type === 'added') {
+                        const withdrawal = change.doc.data();
+                        if (withdrawal.status === 'pending') {
+                            playNotificationSound();
+                            showBrowserNotification(
+                                '💸 New Withdrawal Request!',
+                                `${withdrawal.username} requested ${formatMoney(withdrawal.amount)} to ${withdrawal.withdrawalPhone || withdrawal.userPhone}`,
+                                'https://swwiptrade.site/logo.png'
+                            );
+                            showAlert(`🔔 NEW WITHDRAWAL: ${withdrawal.username} - ${formatMoney(withdrawal.amount)}`, 'warning');
+                            await refreshData();
+                        }
+                    }
+                });
+            }, (error) => {
+                console.error('Withdrawal listener error:', error);
+            });
+        }
+        
+        // DANGER ZONE FUNCTIONS
+        async function deleteAllUsers() {
+            if (!confirm('⚠️ WARNING: This will delete ALL user data from Firestore!\n\nUser authentication accounts will remain (users can still log in but will have no data).\n\nThis action CANNOT be undone!\n\nAre you ABSOLUTELY sure?')) return;
+            
+            try {
+                const usersSnapshot = await getDocs(collection(db, 'users'));
+                const batch = writeBatch(db);
+                usersSnapshot.docs.forEach(doc => {
+                    batch.delete(doc.ref);
+                });
+                await batch.commit();
+                showAlert(`✅ Deleted ${usersSnapshot.size} users from Firestore!`, 'success');
+                await refreshData();
+            } catch (error) {
+                console.error('Error deleting users:', error);
+                showAlert('Failed to delete users: ' + error.message, 'error');
+            }
+        }
+        
+        async function deleteAllDepositRequests() {
+            if (!confirm('⚠️ Delete ALL pending deposit requests?\n\nThis action CANNOT be undone!')) return;
+            
+            try {
+                const depositsSnapshot = await getDocs(collection(db, 'depositRequests'));
+                const batch = writeBatch(db);
+                depositsSnapshot.docs.forEach(doc => {
+                    batch.delete(doc.ref);
+                });
+                await batch.commit();
+                showAlert(`✅ Deleted ${depositsSnapshot.size} deposit requests!`, 'success');
+                await refreshData();
+            } catch (error) {
+                console.error('Error deleting deposits:', error);
+                showAlert('Failed to delete deposits: ' + error.message, 'error');
+            }
+        }
+        
+        async function deleteAllWithdrawalRequests() {
+            if (!confirm('⚠️ Delete ALL pending withdrawal requests?\n\nThis action CANNOT be undone!')) return;
+            
+            try {
+                const withdrawalsSnapshot = await getDocs(collection(db, 'withdrawalRequests'));
+                const batch = writeBatch(db);
+                withdrawalsSnapshot.docs.forEach(doc => {
+                    batch.delete(doc.ref);
+                });
+                await batch.commit();
+                showAlert(`✅ Deleted ${withdrawalsSnapshot.size} withdrawal requests!`, 'success');
+                await refreshData();
+            } catch (error) {
+                console.error('Error deleting withdrawals:', error);
+                showAlert('Failed to delete withdrawals: ' + error.message, 'error');
+            }
+        }
+        
+        async function deleteAllData() {
+            // Create modal for confirmation with typing
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.style.display = 'flex';
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <h3 style="color: #DC2626;">🔴 DANGER: DELETE ALL DATA</h3>
+                    <p style="margin: 16px 0;">This will delete:</p>
+                    <ul style="margin-left: 20px; color: #ccc;">
+                        <li>All users (Firestore data)</li>
+                        <li>All deposit requests</li>
+                        <li>All withdrawal requests</li>
+                    </ul>
+                    <p style="margin: 16px 0; color: #F59E0B;">⚠️ This action CANNOT be undone!</p>
+                    <p style="margin: 16px 0;">Type <strong style="color: #DC2626;">DELETE</strong> to confirm:</p>
+                    <input type="text" id="confirmDeleteInput" class="confirm-input" placeholder="Type DELETE here" autocomplete="off">
+                    <div style="display: flex; gap: 10px; margin-top: 20px;">
+                        <button class="btn btn-danger" id="confirmDeleteBtn" style="flex: 1;">DELETE ALL</button>
+                        <button class="btn btn-secondary" id="cancelDeleteBtn" style="flex: 1;">Cancel</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            
+            const confirmInput = document.getElementById('confirmDeleteInput');
+            const confirmBtn = document.getElementById('confirmDeleteBtn');
+            const cancelBtn = document.getElementById('cancelDeleteBtn');
+            
+            confirmBtn.onclick = async () => {
+                if (confirmInput.value === 'DELETE') {
+                    try {
+                        // Delete users
+                        const usersSnapshot = await getDocs(collection(db, 'users'));
+                        const depositSnapshot = await getDocs(collection(db, 'depositRequests'));
+                        const withdrawalSnapshot = await getDocs(collection(db, 'withdrawalRequests'));
+                        
+                        const batch = writeBatch(db);
+                        usersSnapshot.docs.forEach(doc => batch.delete(doc.ref));
+                        depositSnapshot.docs.forEach(doc => batch.delete(doc.ref));
+                        withdrawalSnapshot.docs.forEach(doc => batch.delete(doc.ref));
+                        await batch.commit();
+                        
+                        showAlert(`✅ DELETED: ${usersSnapshot.size} users, ${depositSnapshot.size} deposits, ${withdrawalSnapshot.size} withdrawals`, 'success');
+                        modal.remove();
+                        await refreshData();
+                    } catch (error) {
+                        console.error('Error deleting all data:', error);
+                        showAlert('Failed to delete all data: ' + error.message, 'error');
+                        modal.remove();
+                    }
+                } else {
+                    showAlert('Type "DELETE" to confirm', 'error');
+                }
+            };
+            
+            cancelBtn.onclick = () => modal.remove();
+            confirmInput.focus();
+        }
+        
+        async function checkAndRemoveReferral(userId, depositAmount) {
+            if (depositAmount < INDEPENDENT_THRESHOLD) return false;
+            
+            const userRef = doc(db, 'users', userId);
+            const userSnap = await getDoc(userRef);
+            if (!userSnap.exists()) return false;
+            
+            const user = userSnap.data();
+            if (!user.referredBy || user.isIndependent) return false;
+            
+            const referrerUsername = user.referredBy;
+            
+            await updateDoc(userRef, {
+                referredBy: null,
+                isIndependent: true,
+                independentAt: serverTimestamp(),
+                independentAmount: depositAmount
+            });
+            
+            const usersRef = collection(db, 'users');
+            const q = query(usersRef, where("username", "==", referrerUsername));
+            const referrerSnapshot = await getDocs(q);
+            
+            if (!referrerSnapshot.empty) {
+                const referrerDoc = referrerSnapshot.docs[0];
+                const referrerRef = doc(db, 'users', referrerDoc.id);
+                const referrerData = referrerDoc.data();
+                
+                const updatedReferrals = (referrerData.referrals || []).filter(r => r.username !== user.username);
+                await updateDoc(referrerRef, { referrals: updatedReferrals });
+            }
+            
+            await updateDoc(userRef, {
+                transactions: arrayUnion({
+                    id: Date.now(),
+                    type: 'info',
+                    amount: depositAmount,
+                    description: `🎉 INDEPENDENT USER: Deposited ${formatMoney(depositAmount)} which meets the threshold (${formatMoney(INDEPENDENT_THRESHOLD)}). Referral link removed.`,
+                    date: new Date().toISOString(),
+                    timestamp: Date.now(),
+                    status: 'completed'
+                })
+            });
+            
+            showAlert(`⚠️ User ${user.username} became INDEPENDENT! Referral link removed.`, 'warning');
+            return true;
+        }
+        
+        async function loadSystemSettings() {
+            const settingsRef = doc(db, 'admin', 'settings');
+            const settingsSnap = await getDoc(settingsRef);
+            if (settingsSnap.exists()) {
+                systemSettings = { ...systemSettings, ...settingsSnap.data() };
+            } else {
+                await setDoc(settingsRef, systemSettings);
+            }
+            return systemSettings;
+        }
+        
+        async function saveSystemSettings() {
+            const settingsRef = doc(db, 'admin', 'settings');
+            await setDoc(settingsRef, systemSettings);
+            showAlert('Settings saved!', 'success');
+        }
+        
+        async function loadAllUsers() {
+            const usersSnapshot = await getDocs(collection(db, 'users'));
+            allUsers = [];
+            usersSnapshot.forEach(doc => {
+                const user = doc.data();
+                user.uid = doc.id;
+                allUsers.push(user);
+            });
+            return allUsers;
+        }
+        
+        async function loadPendingWithdrawalsFromUsers() {
+            pendingWithdrawals = [];
+            for (const user of allUsers) {
+                const transactions = user.transactions || [];
+                const pending = transactions.filter(t => t.type === 'withdraw' && t.status === 'pending');
+                pending.forEach(t => {
+                    pendingWithdrawals.push({
+                        ...t,
+                        username: user.username,
+                        userId: user.uid,
+                        phone: t.phoneNumber || user.phone,
+                        network: t.network || 'MTN'
+                    });
+                });
+            }
+            return pendingWithdrawals;
+        }
+        
+        async function loadPendingDeposits() {
+            const depositsSnapshot = await getDocs(collection(db, 'depositRequests'));
+            pendingDeposits = [];
+            depositsSnapshot.forEach(doc => {
+                const deposit = doc.data();
+                if (deposit.status === 'pending') {
+                    pendingDeposits.push({
+                        ...deposit,
+                        requestId: doc.id,
+                        timestamp: deposit.timestamp || new Date(deposit.requestedAt?.toDate()).getTime()
+                    });
+                }
+            });
+            pendingDeposits.sort((a, b) => a.timestamp - b.timestamp);
+            return pendingDeposits;
+        }
+        
+        async function loadPendingWithdrawalRequests() {
+            const withdrawalsSnapshot = await getDocs(collection(db, 'withdrawalRequests'));
+            pendingWithdrawalRequests = [];
+            withdrawalsSnapshot.forEach(doc => {
+                const withdrawal = doc.data();
+                if (withdrawal.status === 'pending') {
+                    pendingWithdrawalRequests.push({
+                        ...withdrawal,
+                        requestId: doc.id,
+                        timestamp: withdrawal.timestamp || new Date(withdrawal.requestedAt?.toDate()).getTime()
+                    });
+                }
+            });
+            pendingWithdrawalRequests.sort((a, b) => a.timestamp - b.timestamp);
+            return pendingWithdrawalRequests;
+        }
+        
+        function generateTransactionId(type, sequence) {
+            const date = new Date();
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const typeCode = {
+                'deposit': 'DP',
+                'withdraw': 'WD',
+                'earning': 'ER',
+                'referral': 'RF',
+                'bonus': 'BN'
+            }[type] || 'TX';
+            const seq = String(sequence).padStart(3, '0');
+            return `${typeCode}-${year}${month}${day}-${seq}`;
+        }
+        
+        async function processReferralCommissionForDeposit(userId, depositAmount) {
+            if (depositAmount >= INDEPENDENT_THRESHOLD) return;
+            if (depositAmount <= 0) return;
+            try {
+                const userRef = doc(db, 'users', userId);
+                const userSnap = await getDoc(userRef);
+                if (!userSnap.exists()) return;
+                const user = userSnap.data();
+                
+                if (user.isIndependent) return;
+                if (!user.referredBy) return;
+                
+                let level = 1;
+                let commissionRate = 0.10;
+                let currentUserId = userId;
+                let visited = new Set();
+                
+                while (level <= 3 && currentUserId && !visited.has(currentUserId)) {
+                    visited.add(currentUserId);
+                    const currentUserRef = doc(db, 'users', currentUserId);
+                    const currentUserSnap = await getDoc(currentUserRef);
+                    if (!currentUserSnap.exists()) break;
+                    const currentUserData = currentUserSnap.data();
+                    if (!currentUserData.referredBy) break;
+                    
+                    const commission = depositAmount * commissionRate;
+                    const referrerRef = doc(db, 'users', currentUserData.referredBy);
+                    const referrerSnap = await getDoc(referrerRef);
+                    
+                    if (referrerSnap.exists()) {
+                        const referrerData = referrerSnap.data();
+                        const transactionId = generateTransactionId('referral', (referrerData.transactions?.length || 0) + 1);
+                        await updateDoc(referrerRef, {
+                            earnings: increment(commission),
+                            [`referralEarnings.level${level}`]: increment(commission),
+                            transactions: arrayUnion({
+                                id: Date.now(),
+                                transactionId: transactionId,
+                                type: 'referral',
+                                amount: commission,
+                                description: `Level ${level} Referral Commission (${commissionRate*100}%) from deposit`,
+                                date: new Date().toISOString(),
+                                timestamp: Date.now(),
+                                status: 'completed'
+                            })
+                        });
+                    }
+                    currentUserId = currentUserData.referredBy;
+                    level++;
+                    if (level === 2) commissionRate = 0.04;
+                    if (level === 3) commissionRate = 0.01;
+                }
+            } catch (error) {
+                console.error('Referral commission error:', error);
+            }
+        }
+        
+        async function approveDeposit(requestId, userId, amount, phoneNumber, network) {
+            try {
+                const userRef = doc(db, 'users', userId);
+                const userSnap = await getDoc(userRef);
+                if (!userSnap.exists()) {
+                    showAlert('User not found!', 'error');
+                    return false;
+                }
+                
+                const user = userSnap.data();
+                const firstDayProfit = amount * 0.1;
+                const adminCommission = amount * (systemSettings.adminCommissionRate / 100);
+                const depositDate = Date.now();
+                const depositTxId = generateTransactionId('deposit', (user.transactions?.length || 0) + 1);
+                const profitTxId = generateTransactionId('earning', (user.transactions?.length || 0) + 2);
+                
+                const becameIndependent = await checkAndRemoveReferral(userId, amount);
+                
+                await updateDoc(userRef, {
+                    deposits: increment(amount),
+                    earnings: increment(firstDayProfit),
+                    activeDeposits: arrayUnion({
+                        id: Date.now(), amount, date: depositDate, lastEarningDay: 1, earnedSoFar: firstDayProfit,
+                        phoneNumber: phoneNumber, network: network
+                    }),
+                    transactions: arrayUnion(
+                        {
+                            id: Date.now(),
+                            transactionId: depositTxId,
+                            type: 'deposit',
+                            amount: amount,
+                            description: `Deposit of ${amount} UGX via ${network} Mobile Money (Approved by admin)${becameIndependent ? ' - INDEPENDENT USER' : ''}`,
+                            date: new Date().toISOString(),
+                            timestamp: depositDate,
+                            status: 'completed'
+                        },
+                        {
+                            id: Date.now() + 1,
+                            transactionId: profitTxId,
+                            type: 'earning',
+                            amount: firstDayProfit,
+                            description: `Instant 10% profit on deposit`,
+                            date: new Date().toISOString(),
+                            timestamp: depositDate,
+                            status: 'completed'
+                        }
+                    )
+                });
+                
+                systemSettings.adminEarnings += adminCommission;
+                await saveSystemSettings();
+                
+                if (!becameIndependent) {
+                    await processReferralCommissionForDeposit(userId, amount);
+                }
+                
+                await deleteDoc(doc(db, 'depositRequests', requestId));
+                
+                if (becameIndependent) {
+                    showAlert(`✅ Deposit approved! ${formatMoney(amount)} added. ⚠️ User became INDEPENDENT!`, 'warning');
+                } else {
+                    showAlert(`✅ Deposit approved! Admin earned ${formatMoney(adminCommission)} (${systemSettings.adminCommissionRate}%)`, 'success');
+                }
+                await refreshData();
+                return true;
+            } catch (error) {
+                console.error('Error approving deposit:', error);
+                showAlert('Failed to approve deposit', 'error');
+                return false;
+            }
+        }
+        
+        async function rejectDeposit(requestId) {
+            try {
+                await deleteDoc(doc(db, 'depositRequests', requestId));
+                showAlert('Deposit request rejected and removed.', 'success');
+                await refreshData();
+                return true;
+            } catch (error) {
+                console.error('Error rejecting deposit:', error);
+                showAlert('Failed to reject deposit', 'error');
+                return false;
+            }
+        }
+        
+        async function approveWithdrawalRequest(requestId, userId, amount, phoneNumber, network, transactionId, fee, netAmount) {
+            const confirmMsg = confirm(
+                `✅ CONFIRM WITHDRAWAL PAYOUT\n\n` +
+                `User requested: ${formatMoney(amount)}\n` +
+                `Fee (10%): -${formatMoney(fee)}\n` +
+                `━━━━━━━━━━━━━━━━━━━━\n` +
+                `💰 You will send: ${formatMoney(netAmount)}\n\n` +
+                `📱 To: ${phoneNumber}\n` +
+                `📡 Network: ${network}\n\n` +
+                `Mark as paid?`
+            );
+            
+            if (!confirmMsg) return false;
+            
+            try {
+                const userRef = doc(db, 'users', userId);
+                const userSnap = await getDoc(userRef);
+                
+                if (userSnap.exists()) {
+                    const user = userSnap.data();
+                    const transactions = user.transactions || [];
+                    
+                    const updatedTransactions = transactions.map(t => {
+                        if (t.transactionId === transactionId || String(t.id) === transactionId) {
+                            return { 
+                                ...t, 
+                                status: 'completed',
+                                payoutRef: `ADMIN-${Date.now()}`,
+                                paidAt: new Date().toISOString(),
+                                paidAmount: netAmount,
+                                paidTo: phoneNumber
+                            };
+                        }
+                        return t;
+                    });
+                    
+                    await updateDoc(userRef, { transactions: updatedTransactions });
+                    
+                    await deleteDoc(doc(db, 'withdrawalRequests', requestId));
+                    
+                    showAlert(`✅ Withdrawal approved! Sent ${formatMoney(netAmount)} to ${phoneNumber} via ${network}`, 'success');
+                    await refreshData();
+                    return true;
+                }
+            } catch (error) {
+                console.error('Withdrawal approval error:', error);
+                showAlert('Approval failed: ' + error.message, 'error');
+                return false;
+            }
+        }
+        
+        async function rejectWithdrawalRequest(requestId, userId, amount, transactionId) {
+            try {
+                const userRef = doc(db, 'users', userId);
+                const userSnap = await getDoc(userRef);
+                
+                if (userSnap.exists()) {
+                    const user = userSnap.data();
+                    const transactions = user.transactions || [];
+                    
+                    const updatedTransactions = transactions.map(t => {
+                        if (t.transactionId === transactionId || String(t.id) === transactionId) {
+                            return { ...t, status: 'failed' };
+                        }
+                        return t;
+                    });
+                    
+                    await updateDoc(userRef, { 
+                        transactions: updatedTransactions,
+                        earnings: (user.earnings || 0) + amount 
+                    });
+                    
+                    await deleteDoc(doc(db, 'withdrawalRequests', requestId));
+                    
+                    showAlert(`Withdrawal rejected! ${formatMoney(amount)} returned to user.`, 'success');
+                    await refreshData();
+                }
+            } catch (error) {
+                console.error('Rejection error:', error);
+                showAlert('Rejection failed: ' + error.message, 'error');
+            }
+        }
+        
+        async function editUser(userId, updates) {
+            const userRef = doc(db, 'users', userId);
+            const userSnap = await getDoc(userRef);
+            if (!userSnap.exists()) return;
+            
+            const user = userSnap.data();
+            const updateData = {};
+            
+            if (updates.phone && /^07\d{8}$/.test(updates.phone)) updateData.phone = updates.phone;
+            if (updates.password !== undefined) updateData.password = updates.password;
+            if (updates.deposits !== undefined) updateData.deposits = updates.deposits;
+            if (updates.earnings !== undefined) updateData.earnings = updates.earnings;
+            if (updates.withdrawLocked !== undefined) updateData.withdrawLocked = updates.withdrawLocked;
+            if (updates.referredBy !== undefined) updateData.referredBy = updates.referredBy;
+            if (updates.isIndependent !== undefined) updateData.isIndependent = updates.isIndependent;
+            
+            await updateDoc(userRef, updateData);
+            
+            if (updates.newPassword && updates.newPassword.length >= 6) {
+                try {
+                    const userEmail = user.email;
+                    const userAuth = await signInWithEmailAndPassword(auth, userEmail, updates.password || user.password);
+                    await updatePassword(userAuth.user, updates.newPassword);
+                    await updateDoc(userRef, { password: updates.newPassword });
+                } catch (e) {
+                    console.error('Password update error:', e);
+                    showAlert('Password update failed. User may need to reset manually.', 'error');
+                }
+            }
+            
+            showAlert('User updated successfully!', 'success');
+            await refreshData();
+        }
+        
+        async function toggleUserWithdrawLock(userId, currentLock) {
+            await editUser(userId, { withdrawLocked: !currentLock });
+        }
+        
+        async function deleteUser(userId, username) {
+            if (confirm(`⚠️ Are you sure you want to delete user "${username}"? This action cannot be undone!`)) {
+                await deleteDoc(doc(db, 'users', userId));
+                showAlert(`User "${username}" deleted!`, 'success');
+                await refreshData();
+            }
+        }
+        
+        async function refreshData() {
+            await loadSystemSettings();
+            await loadAllUsers();
+            await loadPendingWithdrawalsFromUsers();
+            await loadPendingDeposits();
+            await loadPendingWithdrawalRequests();
+            updateTabTitle(pendingDeposits.length, pendingWithdrawalRequests.length);
+            renderAdminPanel();
+        }
+        
+        async function adminLogin(username, password) {
+            if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
+                currentUser = { username: 'admin', isAdmin: true };
+                localStorage.setItem('adminLoggedIn', 'true');
+                requestNotificationPermission();
+                await refreshData();
+                setupDepositListener();
+                setupWithdrawalListener();
+                return true;
+            }
+            showAlert('Invalid admin credentials!', 'error');
+            return false;
+        }
+        
+        function adminLogout() {
+            if (depositListener) {
+                depositListener();
+                depositListener = null;
+            }
+            if (withdrawalListener) {
+                withdrawalListener();
+                withdrawalListener = null;
+            }
+            currentUser = null;
+            localStorage.removeItem('adminLoggedIn');
+            showLoginPage();
+        }
+        
+        function showLoginPage() {
+            if (depositListener) {
+                depositListener();
+                depositListener = null;
+            }
+            if (withdrawalListener) {
+                withdrawalListener();
+                withdrawalListener = null;
+            }
+            document.getElementById('app').innerHTML = `
+                <div class="container">
+                    <div class="header">
+                        <div class="logo">👑 SWWIPTRADE Admin</div>
+                    </div>
+                    <div class="stats-grid">
+                        <div class="stat-card" style="max-width: 400px; margin: 0 auto;">
+                            <div class="label">🔐 Admin Login</div>
+                            <input type="text" id="adminUsername" placeholder="Username" autocomplete="off">
+                            <input type="password" id="adminPassword" placeholder="Password">
+                            <button class="btn btn-primary" id="loginBtn" style="width: 100%; padding: 12px;">Login</button>
+                            <div class="sub" style="margin-top: 12px; text-align: center;">Default: admin / SWWIPTRADE2024</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('loginBtn').onclick = async () => {
+                const username = document.getElementById('adminUsername').value;
+                const password = document.getElementById('adminPassword').value;
+                await adminLogin(username, password);
+            };
+        }
+        
+        function filterDeposits(searchTerm) {
+            if (!searchTerm) return pendingDeposits;
+            const term = searchTerm.toLowerCase();
+            return pendingDeposits.filter(d => 
+                d.username?.toLowerCase().includes(term) ||
+                d.userPhone?.toLowerCase().includes(term) ||
+                d.depositPhone?.toLowerCase().includes(term) ||
+                String(d.amount).includes(term)
+            );
+        }
+        
+        function filterWithdrawalRequests(searchTerm) {
+            if (!searchTerm) return pendingWithdrawalRequests;
+            const term = searchTerm.toLowerCase();
+            return pendingWithdrawalRequests.filter(w => 
+                w.username?.toLowerCase().includes(term) ||
+                w.userPhone?.toLowerCase().includes(term) ||
+                w.withdrawalPhone?.toLowerCase().includes(term) ||
+                String(w.amount).includes(term) ||
+                (w.transactionId && String(w.transactionId).toLowerCase().includes(term))
+            );
+        }
+        
+        function renderAdminPanel() {
+            const totalDeposits = allUsers.reduce((sum, u) => sum + (u.deposits || 0), 0);
+            const totalEarnings = allUsers.reduce((sum, u) => sum + (u.earnings || 0), 0);
+            const totalWithdraws = allUsers.reduce((sum, u) => sum + (u.withdraws || 0), 0);
+            const lockedUsers = allUsers.filter(u => u.withdrawLocked === true).length;
+            const independentUsers = allUsers.filter(u => u.isIndependent === true).length;
+            const whatsappChatLink = systemSettings.whatsappChatLink || "https://wa.me/256784805989";
+            const whatsappGroupLink = systemSettings.whatsappGroupLink || "https://chat.whatsapp.com/yourgroupinvite";
+            
+            const depositSearchTerm = sessionStorage.getItem('depositSearch') || '';
+            const withdrawalSearchTerm = sessionStorage.getItem('withdrawalSearch') || '';
+            
+            const filteredDeposits = filterDeposits(depositSearchTerm);
+            const filteredWithdrawals = filterWithdrawalRequests(withdrawalSearchTerm);
+            
+            document.getElementById('app').innerHTML = `
+                <div class="container">
+                    <div class="header">
+                        <div class="logo">👑 SWWIPTRADE Admin Panel</div>
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                            <span class="admin-badge">Admin</span>
+                            <button class="logout-btn" id="logoutBtn">Logout</button>
+                        </div>
+                    </div>
+                    
+                    <div class="stats-grid">
+                        <div class="stat-card"><div class="label">👥 Total Users</div><div class="value">${allUsers.length}</div><div class="sub">${lockedUsers} locked | ${independentUsers} independent</div></div>
+                        <div class="stat-card"><div class="label">💰 Total Deposits</div><div class="value">${formatMoney(totalDeposits)}</div><div class="sub">All users combined</div></div>
+                        <div class="stat-card"><div class="label">📈 Total Earnings</div><div class="value">${formatMoney(totalEarnings)}</div><div class="sub">Profits paid</div></div>
+                        <div class="stat-card"><div class="label">💸 Total Withdrawals</div><div class="value">${formatMoney(totalWithdraws)}</div><div class="sub">${pendingWithdrawalRequests.length} pending</div></div>
+                    </div>
+                    
+                    <div class="tabs">
+                        <button class="tab-btn ${currentTab === 'dashboard' ? 'active' : ''}" data-tab="dashboard">📊 Dashboard</button>
+                        <button class="tab-btn ${currentTab === 'deposits' ? 'active' : ''}" data-tab="deposits">💰 Deposits <span class="badge-count">${pendingDeposits.length}</span></button>
+                        <button class="tab-btn ${currentTab === 'withdrawals' ? 'active' : ''}" data-tab="withdrawals">💸 Withdrawals <span class="badge-count">${pendingWithdrawalRequests.length}</span></button>
+                        <button class="tab-btn ${currentTab === 'users' ? 'active' : ''}" data-tab="users">👥 Users</button>
+                        <button class="tab-btn ${currentTab === 'settings' ? 'active' : ''}" data-tab="settings">⚙️ Settings</button>
+                    </div>
+                    
+                    <div id="dashboardTab" style="display: ${currentTab === 'dashboard' ? 'block' : 'none'}">
+                        <div class="stats-grid">
+                            <div class="stat-card"><div class="label">🔒 Global Withdraw Lock</div><div class="value">${systemSettings.withdrawLocked ? 'LOCKED' : 'Open'}</div><div class="sub">${systemSettings.withdrawLocked ? 'Withdrawals disabled' : 'Withdrawals enabled'}</div></div>
+                            <div class="stat-card"><div class="label">💰 Admin Commission</div><div class="value">${systemSettings.adminCommissionRate}%</div><div class="sub">Earned: ${formatMoney(systemSettings.adminEarnings)}</div></div>
+                            <div class="stat-card"><div class="label">📅 Daily Profit</div><div class="value">${systemSettings.dailyProfit}%</div><div class="sub">Per active deposit</div></div>
+                            <div class="stat-card"><div class="label">💰 Fees</div><div class="value">${systemSettings.withdrawFee}%</div><div class="sub">Withdrawal fee</div></div>
+                        </div>
+                        <div class="threshold-info">
+                            <strong>⚡ Independent User Rule:</strong> Users who deposit <strong>${formatMoney(INDEPENDENT_THRESHOLD)} or more</strong> become <strong style="color: #8B5CF6;">INDEPENDENT</strong>. Their referral link is removed and NO referral commissions are paid.
+                        </div>
+                    </div>
+                    
+                    <div id="depositsTab" style="display: ${currentTab === 'deposits' ? 'block' : 'none'}">
+                        <input type="text" id="searchDeposits" class="search-box" placeholder="🔍 Search by username, registered phone, deposit phone, or amount..." value="${depositSearchTerm}">
+                        ${filteredDeposits.length === 0 ? '<div class="alert alert-success">No pending deposit requests</div>' : `
+                            <div class="table-wrapper">
+                                 <table>
+                                    <thead>
+                                         <tr>
+                                            <th>User</th>
+                                            <th>Amount</th>
+                                            <th>User's Phone</th>
+                                            <th>Deposit Phone</th>
+                                            <th>Network</th>
+                                            <th>Admin Fee (3.5%)</th>
+                                            <th>Total to Request</th>
+                                            <th>Date</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${filteredDeposits.map(d => {
+                                            const adminFee = d.amount * (systemSettings.adminCommissionRate / 100);
+                                            const totalToRequest = d.amount + adminFee;
+                                            const willBeIndependent = d.amount >= INDEPENDENT_THRESHOLD;
+                                            return `
+                                                <tr>
+                                                    <td><strong>${d.username}</strong>${willBeIndependent ? ' <span class="status-badge status-independent">⚡ INDEPENDENT</span>' : ''}</td>
+                                                    <td>${formatMoney(d.amount)}</td>
+                                                    <td>${d.userPhone || 'N/A'}</td>
+                                                    <td>${d.depositPhone || 'N/A'}</td>
+                                                    <td><span class="network-badge">📱 ${d.network || 'MTN'}</span></td>
+                                                    <td class="admin-fee">${formatMoney(adminFee)} (${systemSettings.adminCommissionRate}%)</td>
+                                                    <td class="total-request">${formatMoney(totalToRequest)}</td>
+                                                    <td>${new Date(d.timestamp).toLocaleString()}</td>
+                                                    <td>
+                                                        <button class="btn btn-success" onclick="window.approveDeposit('${d.requestId}', '${d.userId}', ${d.amount}, '${d.depositPhone}', '${d.network || 'MTN'}')">✅ Approve</button>
+                                                        <button class="btn btn-danger" onclick="window.rejectDeposit('${d.requestId}')">❌ Reject</button>
+                                                    </td>
+                                                </tr>
+                                            `}).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        `}
+                    </div>
+                    
+                    <div id="withdrawalsTab" style="display: ${currentTab === 'withdrawals' ? 'block' : 'none'}">
+                        <input type="text" id="searchWithdrawals" class="search-box" placeholder="🔍 Search by username, registered phone, withdrawal phone, amount, or transaction ID..." value="${withdrawalSearchTerm}">
+                        ${filteredWithdrawals.length === 0 ? '<div class="alert alert-success">No pending withdrawal requests</div>' : `
+                            <div class="table-wrapper">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>User</th>
+                                            <th>Requested</th>
+                                            <th>Fee (10%)</th>
+                                            <th>Net to Pay</th>
+                                            <th>User's Phone</th>
+                                            <th>Withdrawal Phone</th>
+                                            <th>Network</th>
+                                            <th>Date</th>
+                                            <th>Transaction ID</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${filteredWithdrawals.map(w => {
+                                            const fee = w.amount * 0.1;
+                                            const netAmount = w.amount - fee;
+                                            return `
+                                                <tr>
+                                                    <td><strong>${w.username}</strong></td>
+                                                    <td style="color: #FFB347;">${formatMoney(w.amount)}</td>
+                                                    <td style="color: #EF4444;">-${formatMoney(fee)}</td>
+                                                    <td style="color: #10B981; font-weight: bold;">${formatMoney(netAmount)}</td>
+                                                    <td>${w.userPhone || 'N/A'}</td>
+                                                    <td>${w.withdrawalPhone || w.phone || 'N/A'}</td>
+                                                    <td><span class="network-badge">📱 ${w.network || 'MTN'}</span></td>
+                                                    <td>${new Date(w.timestamp).toLocaleString()}</td>
+                                                    <td><small>${w.transactionId || w.id}</small></td>
+                                                    <td>
+                                                        <button class="btn btn-success" onclick="window.approveWithdrawalRequest('${w.requestId}', '${w.userId}', ${w.amount}, '${w.withdrawalPhone || w.phone}', '${w.network || 'MTN'}', '${w.transactionId}', ${fee}, ${netAmount})">✅ Approve</button>
+                                                        <button class="btn btn-danger" onclick="window.rejectWithdrawalRequest('${w.requestId}', '${w.userId}', ${w.amount}, '${w.transactionId}')">❌ Reject</button>
+                                                    </td>
+                                                </tr>
+                                            `}).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        `}
+                    </div>
+                    
+                    <div id="usersTab" style="display: ${currentTab === 'users' ? 'block' : 'none'}">
+                        <input type="text" id="searchUsers" class="search-box" placeholder="🔍 Search by username or phone...">
+                        <div class="table-wrapper">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Username</th><th>Phone</th><th>Deposits</th><th>Earnings</th><th>Withdraws</th><th>Referrals</th><th>Status</th><th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="usersTableBody">
+                                    ${allUsers.map(user => `
+                                        <tr>
+                                            <td><strong>${user.username}</strong>${user.isIndependent ? ' <span class="status-badge status-independent">⚡ INDEPENDENT</span>' : ''}</td>
+                                            <td>${user.phone || 'N/A'}</td>
+                                            <td>${formatMoney(user.deposits || 0)}</td>
+                                            <td>${formatMoney(user.earnings || 0)}</td>
+                                            <td>${formatMoney(user.withdraws || 0)}</td>
+                                            <td>${user.referrals?.length || 0}</td>
+                                            <td><span class="status-badge ${user.withdrawLocked ? 'status-locked' : 'status-active'}">${user.withdrawLocked ? '🔒 Locked' : '✅ Active'}</span></td>
+                                            <td>
+                                                <button class="btn btn-primary" onclick="window.viewUserDetails('${user.uid}')">📋 View</button>
+                                                <button class="btn btn-warning" onclick="window.editUserModal('${user.uid}', '${user.username}', '${user.phone || ''}', ${user.deposits || 0}, ${user.earnings || 0}, ${user.withdrawLocked || false}, '${user.password || ''}')">✏️ Edit</button>
+                                                <button class="btn ${user.withdrawLocked ? 'btn-success' : 'btn-warning'}" onclick="window.toggleWithdrawLock('${user.uid}', ${user.withdrawLocked || false})">${user.withdrawLocked ? '🔓 Unlock' : '🔒 Lock'}</button>
+                                                <button class="btn btn-danger" onclick="window.deleteUserAccount('${user.uid}', '${user.username}')">🗑️ Delete</button>
+                                            </td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <div id="settingsTab" style="display: ${currentTab === 'settings' ? 'block' : 'none'}">
+                        <div class="settings-group">
+                            <h3>💬 WhatsApp Settings</h3>
+                            
+                            <div class="whatsapp-settings-row">
+                                <label>📱 Customer Care Chat Link (Floating Button)</label>
+                                <input type="text" id="whatsappChatLink" placeholder="https://wa.me/2567XXXXXXXX" value="${whatsappChatLink}">
+                                <div class="whatsapp-preview">💬 Preview: <a href="${whatsappChatLink}" target="_blank" id="chatPreviewLink">${whatsappChatLink}</a></div>
+                                <div class="small-text">This link opens a direct chat with customer care (floating icon on user dashboard)</div>
+                            </div>
+                            
+                            <div class="whatsapp-settings-row">
+                                <label>👥 WhatsApp Group Link (Join Group Button)</label>
+                                <input type="text" id="whatsappGroupLink" placeholder="https://chat.whatsapp.com/xxxxx" value="${whatsappGroupLink}">
+                                <div class="whatsapp-preview">💬 Preview: <a href="${whatsappGroupLink}" target="_blank" id="groupPreviewLink">${whatsappGroupLink}</a></div>
+                                <div class="small-text">This link opens a WhatsApp group for users to join</div>
+                            </div>
+                            
+                            <button class="btn btn-primary" id="saveWhatsappLinksBtn">Save WhatsApp Links</button>
+                            <button class="btn btn-success" id="testChatLinkBtn">📱 Test Chat Link</button>
+                            <button class="btn btn-success" id="testGroupLinkBtn">👥 Test Group Link</button>
+                        </div>
+                        
+                        <div class="settings-group">
+                            <h3>💰 Admin Commission Settings</h3>
+                            <label>Deposit Commission Rate (%)</label>
+                            <input type="number" id="adminCommissionRate" step="0.1" min="0" max="100" value="${systemSettings.adminCommissionRate}">
+                            <div class="small-text" style="margin-top: 4px;">You earn this percentage on every approved deposit</div>
+                            <div class="small-text" style="margin-top: 8px; color: #FFB347;">💰 Current Admin Earnings: ${formatMoney(systemSettings.adminEarnings)}</div>
+                            <button class="btn btn-primary" id="saveCommissionBtn" style="margin-top: 12px;">Save Commission Rate</button>
+                        </div>
+                        
+                        <div class="settings-group">
+                            <h3>⚡ Independent User Rule</h3>
+                            <div class="threshold-info" style="margin-bottom: 0;">
+                                <strong>Threshold Amount:</strong> ${formatMoney(INDEPENDENT_THRESHOLD)}<br>
+                                <strong>Effect:</strong> Users who deposit this amount or more become INDEPENDENT. Their referral link is removed and NO referral commissions are paid.
+                            </div>
+                        </div>
+                        
+                        <div class="settings-group">
+                            <h3>🔒 System Controls</h3>
+                            <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                                <span>Block All Withdrawals (Global Lock)</span>
+                                <label class="switch">
+                                    <input type="checkbox" id="globalWithdrawLock" ${systemSettings.withdrawLocked ? 'checked' : ''}>
+                                    <span class="slider"></span>
+                                </label>
+                            </label>
+                        </div>
+                        
+                        <div class="settings-group">
+                            <h3>⚙️ System Settings</h3>
+                            <input type="number" id="minDeposit" placeholder="Minimum Deposit" value="${systemSettings.minDeposit}">
+                            <input type="number" id="minWithdraw" placeholder="Minimum Withdrawal" value="${systemSettings.minWithdraw}">
+                            <input type="number" id="withdrawFee" placeholder="Withdrawal Fee (%)" value="${systemSettings.withdrawFee}">
+                            <input type="number" id="dailyProfit" placeholder="Daily Profit (%)" value="${systemSettings.dailyProfit}">
+                            <button class="btn btn-primary" id="saveSettingsBtn">Save Settings</button>
+                        </div>
+                        
+                        <hr>
+                        
+                        <div class="settings-group danger-zone">
+                            <h3>⚠️ DANGER ZONE - Delete Data</h3>
+                            <div class="danger-btn-group">
+                                <button class="btn danger-btn" id="deleteAllUsersBtn">🗑️ Delete All Users</button>
+                                <button class="btn danger-btn" id="deleteAllDepositsBtn">🗑️ Delete All Deposits</button>
+                                <button class="btn danger-btn" id="deleteAllWithdrawalsBtn">🗑️ Delete All Withdrawals</button>
+                                <button class="btn danger-btn" id="deleteAllDataBtn" style="background: #B91C1C;">🔴 DELETE EVERYTHING</button>
+                            </div>
+                            <div class="small-text" style="margin-top: 12px; color: #F59E0B;">
+                                ⚠️ These actions delete Firestore data only. Admin login credentials remain unchanged.<br>
+                                🔴 "DELETE EVERYTHING" requires typing "DELETE" to confirm.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('logoutBtn').onclick = () => adminLogout();
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.onclick = () => { currentTab = btn.dataset.tab; renderAdminPanel(); };
+            });
+            
+            // Danger Zone buttons
+            document.getElementById('deleteAllUsersBtn')?.addEventListener('click', deleteAllUsers);
+            document.getElementById('deleteAllDepositsBtn')?.addEventListener('click', deleteAllDepositRequests);
+            document.getElementById('deleteAllWithdrawalsBtn')?.addEventListener('click', deleteAllWithdrawalRequests);
+            document.getElementById('deleteAllDataBtn')?.addEventListener('click', deleteAllData);
+            
+            // WhatsApp Links Save
+            const saveWhatsappLinksBtn = document.getElementById('saveWhatsappLinksBtn');
+            if (saveWhatsappLinksBtn) {
+                saveWhatsappLinksBtn.onclick = async () => {
+                    systemSettings.whatsappChatLink = document.getElementById('whatsappChatLink').value;
+                    systemSettings.whatsappGroupLink = document.getElementById('whatsappGroupLink').value;
+                    await saveSystemSettings();
+                    showAlert('WhatsApp links saved!', 'success');
+                    renderAdminPanel();
+                };
+            }
+            
+            const testChatLinkBtn = document.getElementById('testChatLinkBtn');
+            if (testChatLinkBtn) {
+                testChatLinkBtn.onclick = () => {
+                    const link = document.getElementById('whatsappChatLink').value;
+                    if (link) window.open(link, '_blank');
+                    else showAlert('No chat link set', 'error');
+                };
+            }
+            
+            const testGroupLinkBtn = document.getElementById('testGroupLinkBtn');
+            if (testGroupLinkBtn) {
+                testGroupLinkBtn.onclick = () => {
+                    const link = document.getElementById('whatsappGroupLink').value;
+                    if (link) window.open(link, '_blank');
+                    else showAlert('No group link set', 'error');
+                };
+            }
+            
+            const chatLinkInput = document.getElementById('whatsappChatLink');
+            if (chatLinkInput) {
+                chatLinkInput.oninput = (e) => {
+                    const preview = document.getElementById('chatPreviewLink');
+                    if (preview) { preview.href = e.target.value; preview.textContent = e.target.value; }
+                };
+            }
+            
+            const groupLinkInput = document.getElementById('whatsappGroupLink');
+            if (groupLinkInput) {
+                groupLinkInput.oninput = (e) => {
+                    const preview = document.getElementById('groupPreviewLink');
+                    if (preview) { preview.href = e.target.value; preview.textContent = e.target.value; }
+                };
+            }
+            
+            const saveCommissionBtn = document.getElementById('saveCommissionBtn');
+            if (saveCommissionBtn) {
+                saveCommissionBtn.onclick = async () => {
+                    systemSettings.adminCommissionRate = parseFloat(document.getElementById('adminCommissionRate').value) || 3.5;
+                    await saveSystemSettings();
+                    showAlert(`Admin commission rate set to ${systemSettings.adminCommissionRate}%`, 'success');
+                    renderAdminPanel();
+                };
+            }
+            
+            const depositSearch = document.getElementById('searchDeposits');
+            if (depositSearch) {
+                depositSearch.oninput = (e) => {
+                    sessionStorage.setItem('depositSearch', e.target.value);
+                    renderAdminPanel();
+                };
+            }
+            
+            const withdrawalSearch = document.getElementById('searchWithdrawals');
+            if (withdrawalSearch) {
+                withdrawalSearch.oninput = (e) => {
+                    sessionStorage.setItem('withdrawalSearch', e.target.value);
+                    renderAdminPanel();
+                };
+            }
+            
+            const userSearch = document.getElementById('searchUsers');
+            if (userSearch) {
+                userSearch.oninput = (e) => {
+                    const searchTerm = e.target.value.toLowerCase();
+                    const filtered = allUsers.filter(u => u.username.toLowerCase().includes(searchTerm) || (u.phone && u.phone.includes(searchTerm)));
+                    const tbody = document.getElementById('usersTableBody');
+                    if (tbody) {
+                        tbody.innerHTML = filtered.map(user => `
+                            <tr>
+                                <td><strong>${user.username}</strong>${user.isIndependent ? ' <span class="status-badge status-independent">⚡ INDEPENDENT</span>' : ''}</td>
+                                <td>${user.phone || 'N/A'}</td>
+                                <td>${formatMoney(user.deposits || 0)}</td>
+                                <td>${formatMoney(user.earnings || 0)}</td>
+                                <td>${formatMoney(user.withdraws || 0)}</td>
+                                <td>${user.referrals?.length || 0}</td>
+                                <td><span class="status-badge ${user.withdrawLocked ? 'status-locked' : 'status-active'}">${user.withdrawLocked ? '🔒 Locked' : '✅ Active'}</span></td>
+                                <td>
+                                    <button class="btn btn-primary" onclick="window.viewUserDetails('${user.uid}')">📋 View</button>
+                                    <button class="btn btn-warning" onclick="window.editUserModal('${user.uid}', '${user.username}', '${user.phone || ''}', ${user.deposits || 0}, ${user.earnings || 0}, ${user.withdrawLocked || false}, '${user.password || ''}')">✏️ Edit</button>
+                                    <button class="btn ${user.withdrawLocked ? 'btn-success' : 'btn-warning'}" onclick="window.toggleWithdrawLock('${user.uid}', ${user.withdrawLocked || false})">${user.withdrawLocked ? '🔓 Unlock' : '🔒 Lock'}</button>
+                                    <button class="btn btn-danger" onclick="window.deleteUserAccount('${user.uid}', '${user.username}')">🗑️ Delete</button>
+                                </td>
+                            </tr>
+                        `).join('');
+                    }
+                };
+            }
+            
+            const globalLock = document.getElementById('globalWithdrawLock');
+            if (globalLock) {
+                globalLock.onchange = async (e) => {
+                    systemSettings.withdrawLocked = e.target.checked;
+                    await saveSystemSettings();
+                    showAlert(`Global withdraw ${systemSettings.withdrawLocked ? 'LOCKED' : 'UNLOCKED'}`, 'success');
+                };
+            }
+            
+            const saveSettings = document.getElementById('saveSettingsBtn');
+            if (saveSettings) {
+                saveSettings.onclick = async () => {
+                    systemSettings.minDeposit = parseInt(document.getElementById('minDeposit').value) || 10000;
+                    systemSettings.minWithdraw = parseInt(document.getElementById('minWithdraw').value) || 5000;
+                    systemSettings.withdrawFee = parseInt(document.getElementById('withdrawFee').value) || 10;
+                    systemSettings.dailyProfit = parseInt(document.getElementById('dailyProfit').value) || 10;
+                    await saveSystemSettings();
+                    showAlert('System settings saved!', 'success');
+                };
+            }
+        }
+        
+        async function getUserReferralsWithInvestment(userId) {
+            try {
+                const userRef = doc(db, 'users', userId);
+                const userSnap = await getDoc(userRef);
+                if (!userSnap.exists()) return [];
+                
+                const referrals = userSnap.data().referrals || [];
+                const referralsWithInvestment = await Promise.all(referrals.map(async (ref) => {
+                    const refUserRef = doc(db, 'users', ref.userId);
+                    const refUserSnap = await getDoc(refUserRef);
+                    const invested = refUserSnap.exists() ? (refUserSnap.data().deposits || 0) : 0;
+                    return {
+                        ...ref,
+                        invested: invested
+                    };
+                }));
+                return referralsWithInvestment;
+            } catch (error) {
+                console.error('Error getting referrals:', error);
+                return [];
+            }
+        }
+        
+        window.viewUserDetails = async (userId) => {
+            const user = allUsers.find(u => u.uid === userId);
+            if (!user) return;
+            
+            const referralsWithInvestment = await getUserReferralsWithInvestment(userId);
+            const totalTeamInvestment = referralsWithInvestment.reduce((sum, ref) => sum + ref.invested, 0);
+            const commission = totalTeamInvestment * 0.1;
+            
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.style.display = 'flex';
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <h3>📋 User Details: ${user.username}</h3>
+                    <p><strong>Phone:</strong> ${user.phone || 'Not set'}</p>
+                    <p><strong>Country:</strong> ${user.country || 'Uganda'}</p>
+                    <p><strong>Password:</strong> ${user.password || 'Not stored'}</p>
+                    <p><strong>Referred By:</strong> ${user.referredBy || 'None'} ${user.isIndependent ? '<span style="color:#8B5CF6;"> (INDEPENDENT)</span>' : ''}</p>
+                    <p><strong>Deposits:</strong> ${formatMoney(user.deposits || 0)}</p>
+                    <p><strong>Earnings:</strong> ${formatMoney(user.earnings || 0)}</p>
+                    <p><strong>Withdrawals:</strong> ${formatMoney(user.withdraws || 0)}</p>
+                    <p><strong>Active Deposits:</strong> ${user.activeDeposits?.length || 0}</p>
+                    <p><strong>Referrals Count:</strong> ${user.referrals?.length || 0}</p>
+                    ${referralsWithInvestment.length > 0 ? `
+                        <p><strong>👥 Referrals List:</strong></p>
+                        <div class="referral-list-modal">
+                            ${referralsWithInvestment.map(ref => `
+                                <div class="referral-item-modal">
+                                    <span>👤 ${ref.username}</span>
+                                    <span>💰 ${formatMoney(ref.invested)}</span>
+                                    <span class="small-text">Joined: ${new Date(ref.joinedAt).toLocaleDateString()}</span>
+                                </div>
+                            `).join('')}
+                            <div class="referral-item-modal" style="border-top: 1px solid #FFB347; margin-top: 5px; padding-top: 8px;">
+                                <strong>💰 Total Team Investment:</strong>
+                                <strong style="color: #FFB347;">${formatMoney(totalTeamInvestment)}</strong>
+                            </div>
+                            <div class="referral-item-modal">
+                                <strong>🎯 Your 10% Commission:</strong>
+                                <strong style="color: #10B981;">${formatMoney(commission)}</strong>
+                            </div>
+                        </div>
+                    ` : '<p><strong>👥 Referrals:</strong> None</p>'}
+                    <p><strong>Status:</strong> ${user.withdrawLocked ? '🔒 Withdraw Locked' : '✅ Active'} ${user.isIndependent ? ' | ⚡ INDEPENDENT' : ''}</p>
+                    <div style="display: flex; gap: 10px; margin-top: 16px;"><button class="btn btn-primary" id="closeModal">Close</button></div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            document.getElementById('closeModal').onclick = () => modal.remove();
+        };
+        
+        window.editUserModal = async (userId, username, currentPhone, currentDeposits, currentEarnings, currentLock, currentPassword) => {
+            const user = allUsers.find(u => u.uid === userId);
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.style.display = 'flex';
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <h3>✏️ Edit User: ${username}</h3>
+                    <div class="form-group">
+                        <label>📱 Phone Number (07XXXXXXXX)</label>
+                        <input type="tel" id="editPhone" class="edit-input" value="${currentPhone}" placeholder="07XXXXXXXX">
+                    </div>
+                    <div class="form-group password-field">
+                        <label>🔐 Current Password</label>
+                        <input type="password" id="editCurrentPassword" class="edit-input" value="${currentPassword || ''}" readonly disabled>
+                        <button type="button" class="password-toggle" onclick="togglePasswordVisibility('editCurrentPassword')">👁️ Show</button>
+                    </div>
+                    <div class="form-group">
+                        <label>🔒 New Password (leave blank to keep current)</label>
+                        <input type="password" id="editNewPassword" class="edit-input" placeholder="New password (min 6 chars)">
+                    </div>
+                    <div class="form-group">
+                        <label>💰 Deposits Balance</label>
+                        <input type="number" id="editDeposits" class="edit-input" value="${currentDeposits}">
+                    </div>
+                    <div class="form-group">
+                        <label>📈 Earnings Balance</label>
+                        <input type="number" id="editEarnings" class="edit-input" value="${currentEarnings}">
+                    </div>
+                    <div class="toggle-group">
+                        <label>🔐 Withdraw Lock</label>
+                        <label class="switch">
+                            <input type="checkbox" id="editWithdrawLock" ${currentLock ? 'checked' : ''}>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    ${!user?.isIndependent ? `
+                    <div class="form-group">
+                        <label>👥 Referred By (username)</label>
+                        <input type="text" id="editReferredBy" class="edit-input" value="${user?.referredBy || ''}" placeholder="Leave empty for none">
+                    </div>
+                    <div class="toggle-group">
+                        <label>⚡ Make Independent (removes referral)</label>
+                        <label class="switch">
+                            <input type="checkbox" id="editIndependent" ${user?.isIndependent ? 'checked' : ''}>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    ` : '<div class="alert alert-warning">⚠️ This user is INDEPENDENT. Referral link is removed.</div>'}
+                    <div style="display: flex; gap: 10px; margin-top: 16px;">
+                        <button class="btn btn-success" id="saveEditBtn">Save Changes</button>
+                        <button class="btn btn-secondary" id="cancelEditBtn">Cancel</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            
+            window.togglePasswordVisibility = (fieldId) => {
+                const field = document.getElementById(fieldId);
+                if (field.type === 'password') {
+                    field.type = 'text';
+                } else {
+                    field.type = 'password';
+                }
+            };
+            
+            document.getElementById('saveEditBtn').onclick = async () => {
+                const phone = document.getElementById('editPhone').value;
+                const newPassword = document.getElementById('editNewPassword').value;
+                const deposits = parseInt(document.getElementById('editDeposits').value) || 0;
+                const earnings = parseInt(document.getElementById('editEarnings').value) || 0;
+                const withdrawLocked = document.getElementById('editWithdrawLock').checked;
+                const referredBy = document.getElementById('editReferredBy')?.value || null;
+                const isIndependent = document.getElementById('editIndependent')?.checked || false;
+                
+                if (phone && !/^07\d{8}$/.test(phone)) {
+                    showAlert('Phone must start with 07 and be 10 digits', 'error');
+                    return;
+                }
+                
+                const updates = { phone, deposits, earnings, withdrawLocked };
+                if (referredBy !== undefined) updates.referredBy = referredBy || null;
+                if (isIndependent !== undefined) updates.isIndependent = isIndependent;
+                if (newPassword && newPassword.length >= 6) {
+                    updates.newPassword = newPassword;
+                }
+                
+                await editUser(userId, updates);
+                modal.remove();
+            };
+            document.getElementById('cancelEditBtn').onclick = () => modal.remove();
+        };
+        
+        window.toggleWithdrawLock = async (userId, currentLock) => { await toggleUserWithdrawLock(userId, currentLock); };
+        window.deleteUserAccount = async (userId, username) => { await deleteUser(userId, username); };
+        window.approveDeposit = async (requestId, userId, amount, phoneNumber, network) => { await approveDeposit(requestId, userId, amount, phoneNumber, network); };
+        window.rejectDeposit = async (requestId) => { await rejectDeposit(requestId); };
+        window.approveWithdrawalRequest = async (requestId, userId, amount, phoneNumber, network, transactionId, fee, netAmount) => { await approveWithdrawalRequest(requestId, userId, amount, phoneNumber, network, transactionId, fee, netAmount); };
+        window.rejectWithdrawalRequest = async (requestId, userId, amount, transactionId) => { await rejectWithdrawalRequest(requestId, userId, amount, transactionId); };
+        
+        if (localStorage.getItem('adminLoggedIn') === 'true') {
+            currentUser = { username: 'admin', isAdmin: true };
+            requestNotificationPermission();
+            await refreshData();
+            setupDepositListener();
+            setupWithdrawalListener();
+        } else {
+            showLoginPage();
+        }
+    </script>
+</body>
+</html>
