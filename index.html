@@ -1106,115 +1106,6 @@
             }
         }
         
-        async function processUserEarnings(uid, userDataSnapshot = null) {
-            const userDataToProcess = userDataSnapshot || userData;
-            if (!userDataToProcess) return 0;
-            
-            const activeDeposits = userDataToProcess.activeDeposits || [];
-            if (activeDeposits.length === 0) {
-                console.log('📊 No active deposits found');
-                return 0;
-            }
-            
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const todayTimestamp = today.getTime();
-            
-            let totalEarnings = 0;
-            let updated = false;
-            let depositsPaid = [];
-            
-            console.log('═══════════════════════════════════════');
-            console.log(`📅 TODAY: ${today.toDateString()}`);
-            console.log('═══════════════════════════════════════');
-            
-            const updatedDeposits = activeDeposits.map((deposit, index) => {
-                const depositDate = new Date(deposit.date);
-                depositDate.setHours(0, 0, 0, 0);
-                const depositTimestamp = depositDate.getTime();
-                
-                const diffTime = todayTimestamp - depositTimestamp;
-                const daysSinceDeposit = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-                const lastEarningDay = deposit.lastEarningDay || 0;
-                const daysToPay = Math.max(0, daysSinceDeposit - lastEarningDay);
-                
-                console.log(`\n💰 DEPOSIT ${index + 1}: ${formatMoney(deposit.amount)}`);
-                console.log(`   Deposit date: ${depositDate.toDateString()}`);
-                console.log(`   Days since deposit: ${daysSinceDeposit}`);
-                console.log(`   Last earning day: ${lastEarningDay}`);
-                console.log(`   Days to pay: ${daysToPay}`);
-                
-                if (daysToPay > 0 && daysSinceDeposit > 0 && daysSinceDeposit <= 60) {
-                    const dailyAmount = deposit.amount * 0.1;
-                    const earningsForDeposit = dailyAmount * daysToPay;
-                    totalEarnings += earningsForDeposit;
-                    
-                    deposit.lastEarningDay = daysSinceDeposit;
-                    deposit.earnedSoFar = (deposit.earnedSoFar || 0) + earningsForDeposit;
-                    updated = true;
-                    
-                    depositsPaid.push(`${formatMoney(deposit.amount)}: +${formatMoney(earningsForDeposit)} (${daysToPay} day(s))`);
-                    console.log(`   ✅ ADDED: ${formatMoney(earningsForDeposit)}`);
-                } else {
-                    console.log(`   ❌ No profit added`);
-                }
-                
-                return deposit;
-            });
-            
-            if (totalEarnings > 0 && uid && updated) {
-                const transactionId = generateTransactionId('earning', (userDataToProcess.transactions?.length || 0) + 1);
-                
-                await updateDoc(doc(db, 'users', uid), {
-                    earnings: increment(totalEarnings),
-                    activeDeposits: updatedDeposits,
-                    transactions: arrayUnion({
-                        id: Date.now(),
-                        transactionId: transactionId,
-                        type: 'earning',
-                        amount: totalEarnings,
-                        description: `Daily Profit (10%) - ${formatMoney(totalEarnings)}`,
-                        date: new Date().toISOString(),
-                        timestamp: Date.now(),
-                        status: 'completed'
-                    })
-                });
-                
-                console.log('\n═══════════════════════════════════════');
-                console.log(`🎉 PROFIT ADDED: ${formatMoney(totalEarnings)}`);
-                depositsPaid.forEach(p => console.log(`   ${p}`));
-                console.log('═══════════════════════════════════════');
-                showBonusNotification(`📈 Daily Profit: +${formatMoney(totalEarnings)}`);
-            } else {
-                console.log('\n📌 No profit added today.');
-            }
-            
-            return totalEarnings;
-        }
-        
-        async function calculateDailyEarnings() {
-            if (!userData || !currentUser) return;
-            console.log('\n🔄 Checking for daily earnings...');
-            await processUserEarnings(currentUser.uid, userData);
-        }
-        
-        async function checkMissedDaysOnLogin() {
-            if (!currentUser || !userData) return;
-            
-            const today = new Date().toDateString();
-            const lastLoginDate = localStorage.getItem('lastLoginDate');
-            
-            console.log(`📆 Last login: ${lastLoginDate || 'Never'}`);
-            console.log(`📆 Today: ${today}`);
-            
-            if (lastLoginDate && lastLoginDate !== today) {
-                console.log('🔄 New day detected! Checking for missed profits...');
-                await calculateDailyEarnings();
-            }
-            
-            localStorage.setItem('lastLoginDate', today);
-        }
-        
         async function submitDepositRequest(amount, phoneNumber, network) {
             if (amount < 10000) { 
                 showSweetError('Minimum Amount Required', `Minimum deposit is 10,000 UGX<br>You entered: ${formatMoney(amount)}`); 
@@ -1432,7 +1323,6 @@
                         console.log(`   Deposit ${i+1}: ${formatMoney(d.amount)}, Date: ${depositDate.toDateString()}, lastEarningDay: ${d.lastEarningDay}`);
                     });
                 }
-                await calculateDailyEarnings();
                 renderDashboard();
             }
         }
@@ -1547,12 +1437,10 @@
                 if (password.length < 6) { showAlert('Password min 6 characters'); return; }
                 if (password !== confirm) { showAlert('Passwords do not match'); return; }
                 
-                // Show loading
                 registerBtn.disabled = true;
                 loadingDiv.style.display = 'block';
                 
                 try {
-                    // Check if username exists
                     const existing = await getDocs(query(collection(db, 'users'), where("username", "==", username)));
                     if (!existing.empty) { 
                         showAlert('Username taken'); 
@@ -1561,7 +1449,6 @@
                         return; 
                     }
                     
-                    // Use valid email format with actual domain
                     const email = `${username}@swwiptrade.site`;
                     const userCred = await createUserWithEmailAndPassword(auth, email, password);
                     const newUserId = userCred.user.uid;
@@ -1604,7 +1491,6 @@
                 } catch (error) { 
                     console.error('Registration error:', error);
                     
-                    // Better error messages
                     if (error.code === 'auth/invalid-email') {
                         showAlert('Invalid username format. Please use letters and numbers only.', 'error');
                     } else if (error.code === 'auth/email-already-in-use') {
@@ -1620,7 +1506,6 @@
                     registerBtn.disabled = false;
                     loadingDiv.style.display = 'none';
                     
-                    // Try to delete the auth user if created but Firestore failed
                     if (error.code !== 'auth/email-already-in-use' && currentUser) {
                         try {
                             await currentUser.delete();
@@ -1716,11 +1601,11 @@
                                 </thead>
                                 <tbody>
                                     ${INVESTMENT_PLANS.map(p => `
-                                          <tr>
+                                           <tr>
                                             <td style="font-weight: bold;">${formatMoney(p.amount)}</td>
                                             <td style="color: #FFB347;">${formatMoney(p.daily)}</td>
                                             <td style="color: #10B981;">${formatMoney(p.total)}</td>
-                                          </tr>
+                                           </tr>
                                     `).join('')}
                                 </tbody>
                               </table>
@@ -2080,7 +1965,6 @@
                 setupActivityListeners();
                 setupAutoRefresh();
                 startTradingUpdates();
-                await checkMissedDaysOnLogin();
                 renderFloatingWhatsApp();
             }
             else { 
