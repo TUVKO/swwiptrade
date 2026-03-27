@@ -43,7 +43,6 @@
             padding-bottom: 70px;
         }
 
-        /* ========== HAMBURGER MENU STYLES ========== */
         .menu-overlay {
             position: fixed;
             top: 0;
@@ -169,9 +168,7 @@
             align-items: center;
             justify-content: center;
         }
-        /* ========== END HAMBURGER MENU STYLES ========== */
 
-        /* ========== NEW BUTTONS STYLES ========== */
         .action-buttons-row {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -217,7 +214,6 @@
             background: #2563EB;
             transform: scale(0.98);
         }
-        /* ========== END NEW BUTTONS STYLES ========== */
 
         .floating-wa {
             position: fixed;
@@ -907,7 +903,6 @@
     <div id="app"></div>
     <div id="floatingWhatsApp"></div>
     
-    <!-- Hamburger Menu Overlay and Sidebar -->
     <div id="menuOverlay" class="menu-overlay"></div>
     <div id="sideMenu" class="side-menu">
         <div class="menu-header">
@@ -947,7 +942,6 @@
                 <span class="icon">👤</span>
                 <span>Profile</span>
             </button>
-            <!-- Download App Button - will be disabled if admin locks it -->
             <button class="menu-item" id="downloadAppBtn">
                 <span class="icon">📱</span>
                 <span>Download App</span>
@@ -998,8 +992,8 @@
         let referralCode = null;
         let unsubscribeSnapshot = null;
         let currentTransactionTab = 'deposits';
-        let whatsappChatLink = "https://wa.me/256784805989";
-        let whatsappGroupLink = "https://chat.whatsapp.com/yourgroupinvite";
+        let whatsappChatLink = "";
+        let whatsappGroupLink = "";
         let selectedNetwork = "MTN";
         
         let inactivityTimer = null;
@@ -1012,16 +1006,13 @@
             profit: 12.50
         };
         
-        // System settings
         let systemSettings = {
             withdrawLocked: false,
             appDownloadDisabled: false
         };
         
-        // ADDED: Flag to prevent duplicate profit processing
         let isProcessingProfit = false;
         
-        // APK Download Link
         const APK_DOWNLOAD_URL = "https://files.appsgeyser.com/SWWIPTRADE_19679351.apk";
         
         async function loadSystemSettings() {
@@ -1030,13 +1021,14 @@
                 const settingsSnap = await getDoc(settingsRef);
                 if (settingsSnap.exists()) {
                     systemSettings = { ...systemSettings, ...settingsSnap.data() };
+                    whatsappChatLink = settingsSnap.data().whatsappChatLink || "";
+                    whatsappGroupLink = settingsSnap.data().whatsappGroupLink || "";
                 }
             } catch (error) {
                 console.error('Error loading system settings:', error);
             }
         }
         
-        // Menu functions
         function openMenu() {
             document.getElementById('sideMenu').classList.add('open');
             document.getElementById('menuOverlay').classList.add('active');
@@ -1058,7 +1050,6 @@
             document.getElementById('closeMenuBtn')?.addEventListener('click', closeMenu);
             document.getElementById('menuOverlay')?.addEventListener('click', closeMenu);
             
-            // Download App button - check if disabled
             const downloadBtn = document.getElementById('downloadAppBtn');
             if (downloadBtn) {
                 if (systemSettings.appDownloadDisabled) {
@@ -1216,7 +1207,6 @@
         function getReferralFromUrl() {
             const params = new URLSearchParams(window.location.search);
             const ref = params.get('ref');
-            console.log('🔗 Referral code from URL:', ref);
             return ref;
         }
         
@@ -1261,12 +1251,8 @@
                 const settingsSnap = await getDoc(settingsRef);
                 if (settingsSnap.exists()) {
                     const data = settingsSnap.data();
-                    if (data.whatsappChatLink) {
-                        whatsappChatLink = data.whatsappChatLink;
-                    }
-                    if (data.whatsappGroupLink) {
-                        whatsappGroupLink = data.whatsappGroupLink;
-                    }
+                    whatsappChatLink = data.whatsappChatLink || "";
+                    whatsappGroupLink = data.whatsappGroupLink || "";
                 }
             } catch (error) {
                 console.error('Error loading WhatsApp links:', error);
@@ -1280,7 +1266,7 @@
                 if (container) container.innerHTML = '';
                 return;
             }
-            if (container && whatsappChatLink && whatsappChatLink !== "https://chat.whatsapp.com/yourgroupinvite") {
+            if (container && whatsappChatLink && whatsappChatLink.trim() !== "") {
                 container.innerHTML = `
                     <div class="floating-wa" id="floatingWABtn">
                         <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" alt="WhatsApp">
@@ -1319,16 +1305,12 @@
             return `${dateStr} • ${timeStr}`;
         }
         
-        // ========== DAILY PROFIT SYSTEM ==========
         async function processUserEarnings(uid, userDataSnapshot = null) {
             const userDataToProcess = userDataSnapshot || userData;
             if (!userDataToProcess) return 0;
             
             const activeDeposits = userDataToProcess.activeDeposits || [];
-            if (activeDeposits.length === 0) {
-                console.log('📊 No active deposits found');
-                return 0;
-            }
+            if (activeDeposits.length === 0) return 0;
             
             const today = new Date();
             today.setHours(0, 0, 0, 0);
@@ -1336,13 +1318,8 @@
             
             let totalEarnings = 0;
             let updated = false;
-            let depositsPaid = [];
             
-            console.log('═══════════════════════════════════════');
-            console.log(`📅 TODAY: ${today.toDateString()}`);
-            console.log('═══════════════════════════════════════');
-            
-            const updatedDeposits = activeDeposits.map((deposit, index) => {
+            const updatedDeposits = activeDeposits.map((deposit) => {
                 const depositDate = new Date(deposit.date);
                 depositDate.setHours(0, 0, 0, 0);
                 const depositTimestamp = depositDate.getTime();
@@ -1352,12 +1329,6 @@
                 const lastEarningDay = deposit.lastEarningDay || 0;
                 const daysToPay = Math.max(0, daysSinceDeposit - lastEarningDay);
                 
-                console.log(`\n💰 DEPOSIT ${index + 1}: ${formatMoney(deposit.amount)}`);
-                console.log(`   Deposit date: ${depositDate.toDateString()}`);
-                console.log(`   Days since deposit: ${daysSinceDeposit}`);
-                console.log(`   Last earning day: ${lastEarningDay}`);
-                console.log(`   Days to pay: ${daysToPay}`);
-                
                 if (daysToPay > 0 && daysSinceDeposit > 0 && daysSinceDeposit <= 60) {
                     const dailyAmount = deposit.amount * 0.1;
                     const earningsForDeposit = dailyAmount * daysToPay;
@@ -1366,11 +1337,6 @@
                     deposit.lastEarningDay = daysSinceDeposit;
                     deposit.earnedSoFar = (deposit.earnedSoFar || 0) + earningsForDeposit;
                     updated = true;
-                    
-                    depositsPaid.push(`${formatMoney(deposit.amount)}: +${formatMoney(earningsForDeposit)} (${daysToPay} day(s))`);
-                    console.log(`   ✅ ADDED: ${formatMoney(earningsForDeposit)}`);
-                } else {
-                    console.log(`   ❌ No profit added`);
                 }
                 
                 return deposit;
@@ -1393,30 +1359,16 @@
                         status: 'completed'
                     })
                 });
-                
-                console.log('\n═══════════════════════════════════════');
-                console.log(`🎉 PROFIT ADDED: ${formatMoney(totalEarnings)}`);
-                depositsPaid.forEach(p => console.log(`   ${p}`));
-                console.log('═══════════════════════════════════════');
-                // Profit notification removed - silent profit addition only
-            } else {
-                console.log('\n📌 No profit added today.');
             }
             
             return totalEarnings;
         }
         
-        // FIXED: Added duplicate prevention
         async function calculateDailyEarnings() {
             if (!userData || !currentUser) return;
-            if (isProcessingProfit) {
-                console.log('⚠️ Profit already processing, skipping duplicate...');
-                return;
-            }
+            if (isProcessingProfit) return;
             
             isProcessingProfit = true;
-            console.log('\n🔄 Checking for daily earnings...');
-            
             try {
                 await processUserEarnings(currentUser.uid, userData);
             } finally {
@@ -1424,7 +1376,6 @@
             }
         }
         
-        // FIXED: Added duplicate prevention
         async function checkMissedDaysOnLogin() {
             if (!currentUser || !userData) return;
             if (isProcessingProfit) return;
@@ -1432,17 +1383,12 @@
             const today = new Date().toDateString();
             const lastLoginDate = localStorage.getItem('lastLoginDate');
             
-            console.log(`📆 Last login: ${lastLoginDate || 'Never'}`);
-            console.log(`📆 Today: ${today}`);
-            
             if (lastLoginDate && lastLoginDate !== today) {
-                console.log('🔄 New day detected! Checking for missed profits...');
                 await calculateDailyEarnings();
             }
             
             localStorage.setItem('lastLoginDate', today);
         }
-        // ========== END DAILY PROFIT SYSTEM ==========
         
         async function processReferralCommission(userId, depositAmount, level = 1, visited = new Set()) {
             if (depositAmount <= 0 || visited.has(userId)) return;
@@ -1652,11 +1598,8 @@
             }
         }
         
-        // MODIFIED: Withdraw with hidden lock - shows "Insufficient Balance" when locked
         async function withdraw(amount, phoneNumber, network) {
-            // Check if withdrawals are locked (hidden lock)
             if (systemSettings.withdrawLocked === true) {
-                // Show "Insufficient Balance" message instead of lock message
                 showSweetError('Insufficient Balance', `You need ${formatMoney(amount)} to withdraw<br>Your available earnings: ${formatMoney(userData?.earnings || 0)}`);
                 return false;
             }
@@ -1764,19 +1707,10 @@
         
         async function loadUserData(uid) {
             await loadSystemSettings();
+            await loadWhatsAppLinks();
             const snap = await getDoc(doc(db, 'users', uid));
             if (snap.exists()) {
                 userData = snap.data();
-                console.log('📊 USER DATA LOADED:');
-                console.log('   Deposits total:', userData.deposits);
-                console.log('   Earnings total:', userData.earnings);
-                console.log('   Active deposits:', userData.activeDeposits?.length || 0);
-                if (userData.activeDeposits && userData.activeDeposits.length > 0) {
-                    userData.activeDeposits.forEach((d, i) => {
-                        const depositDate = new Date(d.date);
-                        console.log(`   Deposit ${i+1}: ${formatMoney(d.amount)}, Date: ${depositDate.toDateString()}, lastEarningDay: ${d.lastEarningDay}`);
-                    });
-                }
                 await calculateDailyEarnings();
                 renderDashboard();
             }
@@ -1973,6 +1907,8 @@
         
         function renderDashboard() {
             updateTradingPrices();
+            const showWhatsappGroupBtn = whatsappGroupLink && whatsappGroupLink.trim() !== "";
+            
             document.getElementById('app').innerHTML = `
                 <div class="container">
                     ${renderHeaderWithLogo(true)}
@@ -2014,16 +1950,17 @@
                         <button class="copy-btn" id="copyLink">Copy</button>
                     </div>
                     
-                    <!-- NEW: Add cash, Cashout, re-invest buttons -->
                     <div class="action-buttons-row">
                         <button class="action-btn action-btn-add" id="addCashBtn">Add cash</button>
                         <button class="action-btn action-btn-cashout" id="cashoutBtn">Cashout</button>
                         <button class="action-btn action-btn-reinvest" id="reinvestBtn">re-invest</button>
                     </div>
                     
+                    ${showWhatsappGroupBtn ? `
                     <div class="card">
                         <button class="btn btn-secondary whatsapp-btn" id="whatsappGroupBtn">💬 Join WhatsApp Group</button>
                     </div>
+                    ` : ''}
                 </div>
                 ${renderBottomNav('home')}
             `;
@@ -2031,13 +1968,15 @@
             document.getElementById('addCashBtn')?.addEventListener('click', () => renderDeposit());
             document.getElementById('cashoutBtn')?.addEventListener('click', () => renderWithdraw());
             document.getElementById('reinvestBtn')?.addEventListener('click', () => renderReinvest());
-            document.getElementById('whatsappGroupBtn')?.addEventListener('click', () => {
-                if (whatsappGroupLink && whatsappGroupLink !== "https://chat.whatsapp.com/yourgroupinvite") {
-                    window.open(whatsappGroupLink, '_blank');
-                } else {
-                    showAlert('WhatsApp group link not set. Contact admin.', 'error');
-                }
-            });
+            if (showWhatsappGroupBtn) {
+                document.getElementById('whatsappGroupBtn')?.addEventListener('click', () => {
+                    if (whatsappGroupLink && whatsappGroupLink.trim() !== "") {
+                        window.open(whatsappGroupLink, '_blank');
+                    } else {
+                        showAlert('WhatsApp group link not set. Contact admin.', 'error');
+                    }
+                });
+            }
             attachBottomNav();
             renderFloatingWhatsApp();
             resetInactivityTimer();
@@ -2057,14 +1996,14 @@
                                 </thead>
                                 <tbody>
                                     ${INVESTMENT_PLANS.map(p => `
-                                          <tr>
+                                           <tr>
                                             <td style="font-weight: bold;">${formatMoney(p.amount)}</td>
                                             <td style="color: #FFB347;">${formatMoney(p.daily)}</td>
                                             <td style="color: #10B981;">${formatMoney(p.total)}</td>
-                                           </tr>
+                                            </tr>
                                     `).join('')}
                                 </tbody>
-                              </table>
+                            </table>
                         </div>
                         <div class="action-grid mt-2">
                             <button class="btn btn-secondary" id="closeTable">Close</button>
@@ -2200,9 +2139,9 @@
                             <table class="investment-table">
                                 <thead>  <th>Level</th><th>Commission</th><th>Earned</th> </thead>
                                 <tbody>
-                                      <tr><td>Level 1</td><td>10%</td><td>${formatMoney(userData?.referralEarnings?.level1 || 0)}</td></tr>
-                                      <tr><td>Level 2</td><td>4%</td><td>${formatMoney(userData?.referralEarnings?.level2 || 0)}</td></tr>
-                                      <tr><td>Level 3</td><td>1%</td><td>${formatMoney(userData?.referralEarnings?.level3 || 0)}</td></tr>
+                                      <td>Level 1</td><td>10%</td><td>${formatMoney(userData?.referralEarnings?.level1 || 0)}</td>
+                                       <td>Level 2</td><td>4%</td><td>${formatMoney(userData?.referralEarnings?.level2 || 0)}</td>
+                                       <td>Level 3</td><td>1%</td><td>${formatMoney(userData?.referralEarnings?.level3 || 0)}</td>
                                 </tbody>
                               </table>
                         </div>
@@ -2338,7 +2277,7 @@
                             <div class="network-option ${selectedNetwork === 'MTN' ? 'selected' : ''}" data-network="MTN">📱 MTN</div>
                             <div class="network-option ${selectedNetwork === 'Airtel' ? 'selected' : ''}" data-network="Airtel">📱 Airtel</div>
                         </div>
-                        <input type="number" id="withdrawAmount" placeholder="Enter amount" ${!hasDeposit ? 'disabled' : ''} oninput="updateFeePreview(this.value)">
+                        <input type="number" id="withdrawAmount" placeholder="Enter amount" ${!hasDeposit ? 'disabled' : ''} oninput="window.updateFeePreview(this.value)">
                         <input type="tel" id="withdrawPhone" placeholder="Mobile Money Number (07XXXXXXXX)" ${!hasDeposit ? 'disabled' : ''} value="${userData?.phone || ''}">
                         <div class="small-text mb-1">Enter the phone number to receive payment</div>
                         <button class="btn btn-danger" id="submitWithdraw" ${!hasDeposit ? 'disabled' : ''}>Request Withdrawal</button>
