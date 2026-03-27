@@ -1006,6 +1006,7 @@
             }
         }
         
+        // FIXED: Midnight Reset - Store deposit date at midnight
         async function approveDeposit(requestId, userId, amount, phoneNumber, network) {
             try {
                 const userRef = doc(db, 'users', userId);
@@ -1018,7 +1019,12 @@
                 const user = userSnap.data();
                 const firstDayProfit = amount * 0.1;
                 const adminCommission = amount * (systemSettings.adminCommissionRate / 100);
-                const depositDate = Date.now();
+                
+                // Set deposit date to MIDNIGHT of today (00:00:00)
+                const depositDate = new Date();
+                depositDate.setHours(0, 0, 0, 0);
+                const depositTimestamp = depositDate.getTime();
+                
                 const depositTxId = generateTransactionId('deposit', (user.transactions?.length || 0) + 1);
                 const profitTxId = generateTransactionId('earning', (user.transactions?.length || 0) + 2);
                 
@@ -1028,8 +1034,13 @@
                     deposits: increment(amount),
                     earnings: increment(firstDayProfit),
                     activeDeposits: arrayUnion({
-                        id: Date.now(), amount, date: depositDate, lastEarningDay: 1, earnedSoFar: firstDayProfit,
-                        phoneNumber: phoneNumber, network: network
+                        id: Date.now(), 
+                        amount, 
+                        date: depositTimestamp,  // Store as midnight timestamp
+                        lastEarningDay: 1,       // Day 1 profit added instantly
+                        earnedSoFar: firstDayProfit,
+                        phoneNumber: phoneNumber, 
+                        network: network
                     }),
                     transactions: arrayUnion(
                         {
@@ -1039,7 +1050,7 @@
                             amount: amount,
                             description: `Deposit of ${amount} UGX via ${network} Mobile Money (Approved by admin)${becameIndependent ? ' - INDEPENDENT USER' : ''}`,
                             date: new Date().toISOString(),
-                            timestamp: depositDate,
+                            timestamp: depositTimestamp,
                             status: 'completed'
                         },
                         {
@@ -1047,9 +1058,9 @@
                             transactionId: profitTxId,
                             type: 'earning',
                             amount: firstDayProfit,
-                            description: `Instant 10% profit on deposit`,
+                            description: `Instant 10% profit on deposit (Day 1)`,
                             date: new Date().toISOString(),
-                            timestamp: depositDate,
+                            timestamp: depositTimestamp,
                             status: 'completed'
                         }
                     )
