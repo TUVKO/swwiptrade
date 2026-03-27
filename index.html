@@ -897,6 +897,110 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+        
+        /* Description Box Styles */
+        .info-box {
+            background: linear-gradient(135deg, #0F172A 0%, #0A0F1A 100%);
+            border: 1px solid #FFB347;
+            border-radius: 24px;
+            padding: 20px;
+            margin-top: 12px;
+        }
+        .info-box-title {
+            text-align: center;
+            margin-bottom: 16px;
+        }
+        .info-box-title h3 {
+            font-size: 20px;
+            font-weight: bold;
+            color: #FFB347;
+            margin-bottom: 8px;
+        }
+        .bonus-badge {
+            background: #FFB34720;
+            display: inline-block;
+            padding: 6px 16px;
+            border-radius: 40px;
+        }
+        .bonus-badge span {
+            font-weight: bold;
+            color: #FFB347;
+        }
+        .divider {
+            border-top: 1px solid #2A2A35;
+            margin: 12px 0;
+        }
+        .feature-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        .feature-icon {
+            font-size: 28px;
+        }
+        .feature-text strong {
+            color: #FFB347;
+        }
+        .feature-text .sub {
+            font-size: 12px;
+            color: #8E8E93;
+        }
+        .stat-card-mini {
+            background: #0D0E14;
+            border-radius: 16px;
+            padding: 12px;
+            margin: 12px 0;
+            text-align: center;
+        }
+        .stat-card-mini .big-number {
+            font-size: 24px;
+        }
+        .green-text {
+            color: #10B981;
+        }
+        .orange-text {
+            color: #FFB347;
+        }
+        .what-you-get {
+            margin: 12px 0;
+        }
+        .what-you-get h4 {
+            color: #FFB347;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        .grid-2col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .details-box {
+            background: #0D0E14;
+            border-radius: 12px;
+            padding: 12px;
+            margin: 12px 0;
+        }
+        .details-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 6px;
+        }
+        .investor-stats {
+            background: #0D0E14;
+            border-radius: 12px;
+            padding: 12px;
+            margin: 12px 0;
+            text-align: center;
+        }
+        .footer-badges {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            margin-top: 12px;
+            font-size: 11px;
+            color: #8E8E93;
+        }
     </style>
 </head>
 <body>
@@ -1678,7 +1782,7 @@
                 
                 showSweetSuccess(
                     'Withdrawal Requested! 💸',
-                    `Your withdrawal request has been submitted<br><br>💰 Amount: ${formatMoney(amount)}<br>📱 To: ${phoneNumber} (${network})<br>⏱️ Processing: 5-30 minutes<br><br>You will be notified when approved`
+                    `Your withdrawal request has been submitted<br><br>💰 Amount: ${formatMoney(amount)}<br>📱 To: ${phoneNumber} (${network})<br>⏱️ Processing: 1-5 minutes<br><br>You will be notified when approved`
                 );
                 return true;
             } catch (error) { 
@@ -1801,6 +1905,78 @@
                         <button class="btn btn-primary" id="doRegister">Register</button>
                         <div class="small-text text-center" style="margin-top: 12px;">
                             Already have an account? <a href="#" id="switchToLogin" style="color: #FFB347;">Login →</a>
+                        </div>
+                    </div>
+                    
+                    <!-- ATTRACTIVE DESCRIPTION BOX -->
+                    <div class="info-box">
+                        <div class="info-box-title">
+                            <h3>🚀 START EARNING TODAY!</h3>
+                            <div class="bonus-badge">
+                                <span>🎁 UGX 4,000 BONUS</span> on registration!
+                            </div>
+                        </div>
+                        
+                        <div class="divider"></div>
+                        
+                        <div class="feature-row">
+                            <div class="feature-icon">🤖</div>
+                            <div class="feature-text">
+                                <strong>AI-POWERED TRADING ROBOT</strong><br>
+                                <span class="sub">24/7 automated trading across global markets</span>
+                            </div>
+                        </div>
+                        
+                        <div class="stat-card-mini">
+                            <div class="feature-icon">⚡</div>
+                            <div><strong class="green-text">0.7% HOURLY PROFIT</strong> <span class="orange-text">→</span> <strong class="orange-text">10% DAILY RETURN</strong></div>
+                            <div class="sub">Our AI bot generates consistent hourly profits</div>
+                        </div>
+                        
+                        <div class="stat-card-mini">
+                            <div class="feature-icon">💸</div>
+                            <div><strong class="green-text">FAST WITHDRAWALS</strong> <span class="orange-text">1-5 MINUTES</span></div>
+                            <div class="sub">Direct to MTN or Airtel Mobile Money</div>
+                        </div>
+                        
+                        <div class="divider"></div>
+                        
+                        <div class="what-you-get">
+                            <h4>📊 WHAT YOU GET:</h4>
+                            <div class="grid-2col">
+                                <div>✅ 10% Daily Profit</div>
+                                <div>✅ Instant 10% on deposit</div>
+                                <div>✅ Fast withdrawals (1-5 min)</div>
+                                <div>✅ 3-Level Referrals (10/4/1%)</div>
+                                <div>✅ 24/7 AI Trading</div>
+                                <div>✅ UGX 4,000 Bonus</div>
+                            </div>
+                        </div>
+                        
+                        <div class="details-box">
+                            <div class="details-row">
+                                <span>💰 Minimum Deposit:</span>
+                                <span class="orange-text"><strong>UGX 10,000</strong></span>
+                            </div>
+                            <div class="details-row">
+                                <span>💸 Minimum Withdrawal:</span>
+                                <span class="orange-text"><strong>UGX 5,000</strong></span>
+                            </div>
+                            <div class="details-row">
+                                <span>⚡ Withdrawal Speed:</span>
+                                <span class="green-text"><strong>1-5 minutes</strong></span>
+                            </div>
+                        </div>
+                        
+                        <div class="investor-stats">
+                            <div style="font-size: 24px; margin-bottom: 4px;">⭐ 3,200+ ACTIVE INVESTORS</div>
+                            <div class="orange-text"><strong>📊 UGX 1.2 BILLION+ PAID OUT</strong></div>
+                        </div>
+                        
+                        <div class="footer-badges">
+                            <span>🔒 256-bit Encryption</span>
+                            <span>⚡ Automated Payouts</span>
+                            <span>💬 24/7 Support</span>
                         </div>
                     </div>
                 </div>
@@ -1996,7 +2172,7 @@
                                 </thead>
                                 <tbody>
                                     ${INVESTMENT_PLANS.map(p => `
-                                           <tr>
+                                            <tr>
                                             <td style="font-weight: bold;">${formatMoney(p.amount)}</td>
                                             <td style="color: #FFB347;">${formatMoney(p.daily)}</td>
                                             <td style="color: #10B981;">${formatMoney(p.total)}</td>
@@ -2139,11 +2315,11 @@
                             <table class="investment-table">
                                 <thead>  <th>Level</th><th>Commission</th><th>Earned</th> </thead>
                                 <tbody>
-                                      <td>Level 1</td><td>10%</td><td>${formatMoney(userData?.referralEarnings?.level1 || 0)}</td>
-                                       <td>Level 2</td><td>4%</td><td>${formatMoney(userData?.referralEarnings?.level2 || 0)}</td>
-                                       <td>Level 3</td><td>1%</td><td>${formatMoney(userData?.referralEarnings?.level3 || 0)}</td>
+                                      <tr><td>Level 1</td><td>10%</td><td>${formatMoney(userData?.referralEarnings?.level1 || 0)}</td></tr>
+                                      <tr><td>Level 2</td><td>4%</td><td>${formatMoney(userData?.referralEarnings?.level2 || 0)}</td></tr>
+                                      <tr><td>Level 3</td><td>1%</td><td>${formatMoney(userData?.referralEarnings?.level3 || 0)}</td></tr>
                                 </tbody>
-                              </table>
+                            </table>
                         </div>
                         ${referralsList.length > 0 ? `
                             <div class="referral-list">
