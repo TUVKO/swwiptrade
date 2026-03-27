@@ -350,6 +350,28 @@
             border-radius: 16px;
         }
 
+        .profit-processor {
+            border: 1px solid #10B981;
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        .profit-processor h3 {
+            color: #10B981;
+            margin-bottom: 16px;
+        }
+
+        .profit-btn {
+            background: #10B981;
+            color: white;
+            padding: 12px 24px;
+            font-size: 14px;
+            margin: 10px 0;
+        }
+
+        .profit-btn:hover {
+            background: #059669;
+        }
+
         .danger-zone {
             border: 1px solid #DC2626;
             background: rgba(220, 38, 38, 0.1);
@@ -536,6 +558,23 @@
             border-color: #2A2A35;
             margin: 16px 0;
         }
+        
+        .progress-status {
+            background: #1E1E2A;
+            border-radius: 12px;
+            padding: 12px;
+            margin-top: 12px;
+            font-size: 12px;
+            font-family: monospace;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .last-processed {
+            color: #8E8E93;
+            font-size: 11px;
+            margin-top: 8px;
+        }
     </style>
 </head>
 <body>
@@ -582,7 +621,8 @@
             whatsappGroupLink: "https://chat.whatsapp.com/yourgroupinvite",
             adminCommissionRate: 3.5,
             adminEarnings: 0,
-            independentThreshold: INDEPENDENT_THRESHOLD
+            independentThreshold: INDEPENDENT_THRESHOLD,
+            lastProfitProcessed: null
         };
         let currentTab = 'dashboard';
         let notificationPermission = false;
@@ -690,119 +730,132 @@
             });
         }
         
-        // DANGER ZONE FUNCTIONS
-        async function deleteAllUsers() {
-            if (!confirm('⚠️ WARNING: This will delete ALL user data from Firestore!\n\nUser authentication accounts will remain (users can still log in but will have no data).\n\nThis action CANNOT be undone!\n\nAre you ABSOLUTELY sure?')) return;
+        // NEW: Process Daily Profits for All Users
+        async function processAllUsersProfit() {
+            if (!confirm('⚠️ This will calculate and add 10% daily profit for ALL users with active deposits.\n\nThis action may take a few moments.\n\nContinue?')) return;
             
-            try {
-                const usersSnapshot = await getDocs(collection(db, 'users'));
-                const batch = writeBatch(db);
-                usersSnapshot.docs.forEach(doc => {
-                    batch.delete(doc.ref);
-                });
-                await batch.commit();
-                showAlert(`✅ Deleted ${usersSnapshot.size} users from Firestore!`, 'success');
-                await refreshData();
-            } catch (error) {
-                console.error('Error deleting users:', error);
-                showAlert('Failed to delete users: ' + error.message, 'error');
-            }
-        }
-        
-        async function deleteAllDepositRequests() {
-            if (!confirm('⚠️ Delete ALL pending deposit requests?\n\nThis action CANNOT be undone!')) return;
-            
-            try {
-                const depositsSnapshot = await getDocs(collection(db, 'depositRequests'));
-                const batch = writeBatch(db);
-                depositsSnapshot.docs.forEach(doc => {
-                    batch.delete(doc.ref);
-                });
-                await batch.commit();
-                showAlert(`✅ Deleted ${depositsSnapshot.size} deposit requests!`, 'success');
-                await refreshData();
-            } catch (error) {
-                console.error('Error deleting deposits:', error);
-                showAlert('Failed to delete deposits: ' + error.message, 'error');
-            }
-        }
-        
-        async function deleteAllWithdrawalRequests() {
-            if (!confirm('⚠️ Delete ALL pending withdrawal requests?\n\nThis action CANNOT be undone!')) return;
-            
-            try {
-                const withdrawalsSnapshot = await getDocs(collection(db, 'withdrawalRequests'));
-                const batch = writeBatch(db);
-                withdrawalsSnapshot.docs.forEach(doc => {
-                    batch.delete(doc.ref);
-                });
-                await batch.commit();
-                showAlert(`✅ Deleted ${withdrawalsSnapshot.size} withdrawal requests!`, 'success');
-                await refreshData();
-            } catch (error) {
-                console.error('Error deleting withdrawals:', error);
-                showAlert('Failed to delete withdrawals: ' + error.message, 'error');
-            }
-        }
-        
-        async function deleteAllData() {
-            // Create modal for confirmation with typing
+            // Create modal to show progress
             const modal = document.createElement('div');
             modal.className = 'modal';
             modal.style.display = 'flex';
             modal.innerHTML = `
-                <div class="modal-content">
-                    <h3 style="color: #DC2626;">🔴 DANGER: DELETE ALL DATA</h3>
-                    <p style="margin: 16px 0;">This will delete:</p>
-                    <ul style="margin-left: 20px; color: #ccc;">
-                        <li>All users (Firestore data)</li>
-                        <li>All deposit requests</li>
-                        <li>All withdrawal requests</li>
-                    </ul>
-                    <p style="margin: 16px 0; color: #F59E0B;">⚠️ This action CANNOT be undone!</p>
-                    <p style="margin: 16px 0;">Type <strong style="color: #DC2626;">DELETE</strong> to confirm:</p>
-                    <input type="text" id="confirmDeleteInput" class="confirm-input" placeholder="Type DELETE here" autocomplete="off">
-                    <div style="display: flex; gap: 10px; margin-top: 20px;">
-                        <button class="btn btn-danger" id="confirmDeleteBtn" style="flex: 1;">DELETE ALL</button>
-                        <button class="btn btn-secondary" id="cancelDeleteBtn" style="flex: 1;">Cancel</button>
+                <div class="modal-content" style="max-width: 500px;">
+                    <h3 style="color: #10B981;">📈 Processing Daily Profits</h3>
+                    <div class="progress-status" id="profitProgress" style="height: 300px;">
+                        Starting...
                     </div>
+                    <button class="btn btn-secondary" id="closeProgressBtn" style="margin-top: 16px;">Close</button>
                 </div>
             `;
             document.body.appendChild(modal);
             
-            const confirmInput = document.getElementById('confirmDeleteInput');
-            const confirmBtn = document.getElementById('confirmDeleteBtn');
-            const cancelBtn = document.getElementById('cancelDeleteBtn');
+            const progressDiv = document.getElementById('profitProgress');
+            let totalProfitAdded = 0;
+            let usersProcessed = 0;
+            let usersWithProfit = 0;
+            let logs = [];
             
-            confirmBtn.onclick = async () => {
-                if (confirmInput.value === 'DELETE') {
-                    try {
-                        // Delete users
-                        const usersSnapshot = await getDocs(collection(db, 'users'));
-                        const depositSnapshot = await getDocs(collection(db, 'depositRequests'));
-                        const withdrawalSnapshot = await getDocs(collection(db, 'withdrawalRequests'));
-                        
-                        const batch = writeBatch(db);
-                        usersSnapshot.docs.forEach(doc => batch.delete(doc.ref));
-                        depositSnapshot.docs.forEach(doc => batch.delete(doc.ref));
-                        withdrawalSnapshot.docs.forEach(doc => batch.delete(doc.ref));
-                        await batch.commit();
-                        
-                        showAlert(`✅ DELETED: ${usersSnapshot.size} users, ${depositSnapshot.size} deposits, ${withdrawalSnapshot.size} withdrawals`, 'success');
-                        modal.remove();
-                        await refreshData();
-                    } catch (error) {
-                        console.error('Error deleting all data:', error);
-                        showAlert('Failed to delete all data: ' + error.message, 'error');
-                        modal.remove();
-                    }
-                } else {
-                    showAlert('Type "DELETE" to confirm', 'error');
+            function addLog(message) {
+                logs.push(message);
+                progressDiv.innerHTML = logs.join('<br>');
+                progressDiv.scrollTop = progressDiv.scrollHeight;
+            }
+            
+            addLog('🔄 Loading all users...');
+            
+            // Get all users
+            const usersSnapshot = await getDocs(collection(db, 'users'));
+            const users = [];
+            usersSnapshot.forEach(doc => {
+                users.push({ id: doc.id, data: doc.data() });
+            });
+            
+            addLog(`📊 Found ${users.length} users`);
+            addLog('═══════════════════════════════════════');
+            
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const todayTimestamp = today.getTime();
+            
+            for (const user of users) {
+                const userData = user.data;
+                const activeDeposits = userData.activeDeposits || [];
+                
+                if (activeDeposits.length === 0) {
+                    continue;
                 }
-            };
+                
+                let userEarnings = 0;
+                let updated = false;
+                let userLogs = [];
+                
+                const updatedDeposits = activeDeposits.map(deposit => {
+                    const depositDate = new Date(deposit.date);
+                    depositDate.setHours(0, 0, 0, 0);
+                    const depositTimestamp = depositDate.getTime();
+                    
+                    const diffTime = todayTimestamp - depositTimestamp;
+                    const daysSinceDeposit = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                    const lastEarningDay = deposit.lastEarningDay || 0;
+                    const daysToPay = Math.max(0, daysSinceDeposit - lastEarningDay);
+                    
+                    if (daysToPay > 0 && daysSinceDeposit > 0 && daysSinceDeposit <= 60) {
+                        const dailyAmount = deposit.amount * 0.1;
+                        const earningsForDeposit = dailyAmount * daysToPay;
+                        userEarnings += earningsForDeposit;
+                        
+                        deposit.lastEarningDay = daysSinceDeposit;
+                        deposit.earnedSoFar = (deposit.earnedSoFar || 0) + earningsForDeposit;
+                        updated = true;
+                        
+                        userLogs.push(`   💰 ${formatMoney(deposit.amount)}: +${formatMoney(earningsForDeposit)} (${daysToPay} day(s))`);
+                    }
+                    
+                    return deposit;
+                });
+                
+                if (userEarnings > 0 && updated) {
+                    const transactionId = generateTransactionId('earning', (userData.transactions?.length || 0) + 1);
+                    
+                    await updateDoc(doc(db, 'users', user.id), {
+                        earnings: increment(userEarnings),
+                        activeDeposits: updatedDeposits,
+                        transactions: arrayUnion({
+                            id: Date.now(),
+                            transactionId: transactionId,
+                            type: 'earning',
+                            amount: userEarnings,
+                            description: `Daily Profit (10%) - ${formatMoney(userEarnings)}`,
+                            date: new Date().toISOString(),
+                            timestamp: Date.now(),
+                            status: 'completed'
+                        })
+                    });
+                    
+                    totalProfitAdded += userEarnings;
+                    usersWithProfit++;
+                    addLog(`✅ ${userData.username}: +${formatMoney(userEarnings)}`);
+                    userLogs.forEach(log => addLog(log));
+                }
+                
+                usersProcessed++;
+            }
             
-            cancelBtn.onclick = () => modal.remove();
-            confirmInput.focus();
+            addLog('═══════════════════════════════════════');
+            addLog(`📈 TOTAL PROFIT ADDED: ${formatMoney(totalProfitAdded)}`);
+            addLog(`👥 Users with profit: ${usersWithProfit}`);
+            addLog(`🕐 Processed at: ${new Date().toLocaleString()}`);
+            
+            // Save last processed timestamp
+            systemSettings.lastProfitProcessed = Date.now();
+            await saveSystemSettings();
+            
+            showAlert(`✅ Processed! Added ${formatMoney(totalProfitAdded)} profit to ${usersWithProfit} users`, 'success');
+            
+            document.getElementById('closeProgressBtn').onclick = () => {
+                modal.remove();
+                refreshData();
+            };
         }
         
         async function checkAndRemoveReferral(userId, depositAmount) {
@@ -1006,7 +1059,6 @@
             }
         }
         
-        // FIXED: Midnight Reset - Store deposit date at midnight
         async function approveDeposit(requestId, userId, amount, phoneNumber, network) {
             try {
                 const userRef = doc(db, 'users', userId);
@@ -1020,7 +1072,6 @@
                 const firstDayProfit = amount * 0.1;
                 const adminCommission = amount * (systemSettings.adminCommissionRate / 100);
                 
-                // Set deposit date to MIDNIGHT of today (00:00:00)
                 const depositDate = new Date();
                 depositDate.setHours(0, 0, 0, 0);
                 const depositTimestamp = depositDate.getTime();
@@ -1036,8 +1087,8 @@
                     activeDeposits: arrayUnion({
                         id: Date.now(), 
                         amount, 
-                        date: depositTimestamp,  // Store as midnight timestamp
-                        lastEarningDay: 1,       // Day 1 profit added instantly
+                        date: depositTimestamp,
+                        lastEarningDay: 1,
                         earnedSoFar: firstDayProfit,
                         phoneNumber: phoneNumber, 
                         network: network
@@ -1332,6 +1383,7 @@
             const independentUsers = allUsers.filter(u => u.isIndependent === true).length;
             const whatsappChatLink = systemSettings.whatsappChatLink || "https://wa.me/256784805989";
             const whatsappGroupLink = systemSettings.whatsappGroupLink || "https://chat.whatsapp.com/yourgroupinvite";
+            const lastProcessed = systemSettings.lastProfitProcessed ? new Date(systemSettings.lastProfitProcessed).toLocaleString() : 'Never';
             
             const depositSearchTerm = sessionStorage.getItem('depositSearch') || '';
             const withdrawalSearchTerm = sessionStorage.getItem('withdrawalSearch') || '';
@@ -1380,19 +1432,9 @@
                         <input type="text" id="searchDeposits" class="search-box" placeholder="🔍 Search by username, registered phone, deposit phone, or amount..." value="${depositSearchTerm}">
                         ${filteredDeposits.length === 0 ? '<div class="alert alert-success">No pending deposit requests</div>' : `
                             <div class="table-wrapper">
-                                 <table>
+                                 表
                                     <thead>
-                                         <tr>
-                                            <th>User</th>
-                                            <th>Amount</th>
-                                            <th>User's Phone</th>
-                                            <th>Deposit Phone</th>
-                                            <th>Network</th>
-                                            <th>Admin Fee (3.5%)</th>
-                                            <th>Total to Request</th>
-                                            <th>Date</th>
-                                            <th>Actions</th>
-                                        </tr>
+                                         <th>User</th><th>Amount</th><th>User's Phone</th><th>Deposit Phone</th><th>Network</th><th>Admin Fee (3.5%)</th><th>Total to Request</th><th>Date</th><th>Actions</th>
                                     </thead>
                                     <tbody>
                                         ${filteredDeposits.map(d => {
@@ -1400,7 +1442,7 @@
                                             const totalToRequest = d.amount + adminFee;
                                             const willBeIndependent = d.amount >= INDEPENDENT_THRESHOLD;
                                             return `
-                                                <tr>
+                                                 <tr>
                                                     <td><strong>${d.username}</strong>${willBeIndependent ? ' <span class="status-badge status-independent">⚡ INDEPENDENT</span>' : ''}</td>
                                                     <td>${formatMoney(d.amount)}</td>
                                                     <td>${d.userPhone || 'N/A'}</td>
@@ -1416,7 +1458,7 @@
                                                 </tr>
                                             `}).join('')}
                                     </tbody>
-                                </table>
+                                 </table>
                             </div>
                         `}
                     </div>
@@ -1425,20 +1467,9 @@
                         <input type="text" id="searchWithdrawals" class="search-box" placeholder="🔍 Search by username, registered phone, withdrawal phone, amount, or transaction ID..." value="${withdrawalSearchTerm}">
                         ${filteredWithdrawals.length === 0 ? '<div class="alert alert-success">No pending withdrawal requests</div>' : `
                             <div class="table-wrapper">
-                                <table>
+                                 <table>
                                     <thead>
-                                        <tr>
-                                            <th>User</th>
-                                            <th>Requested</th>
-                                            <th>Fee (10%)</th>
-                                            <th>Net to Pay</th>
-                                            <th>User's Phone</th>
-                                            <th>Withdrawal Phone</th>
-                                            <th>Network</th>
-                                            <th>Date</th>
-                                            <th>Transaction ID</th>
-                                            <th>Actions</th>
-                                        </tr>
+                                         <th>User</th><th>Requested</th><th>Fee (10%)</th><th>Net to Pay</th><th>User's Phone</th><th>Withdrawal Phone</th><th>Network</th><th>Date</th><th>Transaction ID</th><th>Actions</th>
                                     </thead>
                                     <tbody>
                                         ${filteredWithdrawals.map(w => {
@@ -1462,7 +1493,7 @@
                                                 </tr>
                                             `}).join('')}
                                     </tbody>
-                                </table>
+                                 </table>
                             </div>
                         `}
                     </div>
@@ -1470,11 +1501,9 @@
                     <div id="usersTab" style="display: ${currentTab === 'users' ? 'block' : 'none'}">
                         <input type="text" id="searchUsers" class="search-box" placeholder="🔍 Search by username or phone...">
                         <div class="table-wrapper">
-                            <table>
+                             <table>
                                 <thead>
-                                    <tr>
-                                        <th>Username</th><th>Phone</th><th>Deposits</th><th>Earnings</th><th>Withdraws</th><th>Referrals</th><th>Status</th><th>Actions</th>
-                                    </tr>
+                                     <th>Username</th><th>Phone</th><th>Deposits</th><th>Earnings</th><th>Withdraws</th><th>Referrals</th><th>Status</th><th>Actions</th>
                                 </thead>
                                 <tbody id="usersTableBody">
                                     ${allUsers.map(user => `
@@ -1495,7 +1524,7 @@
                                         </tr>
                                     `).join('')}
                                 </tbody>
-                            </table>
+                             </table>
                         </div>
                     </div>
                     
@@ -1561,6 +1590,16 @@
                         
                         <hr>
                         
+                        <div class="settings-group profit-processor">
+                            <h3>📈 MANUAL PROFIT PROCESSOR</h3>
+                            <p>This will calculate and add 10% daily profit for ALL users with active deposits.</p>
+                            <p>It processes all missed days based on calendar dates (midnight reset).</p>
+                            <button class="btn profit-btn" id="processAllProfitsBtn">🔄 PROCESS DAILY PROFITS FOR ALL USERS</button>
+                            <div class="last-processed">📅 Last processed: ${lastProcessed}</div>
+                        </div>
+                        
+                        <hr>
+                        
                         <div class="settings-group danger-zone">
                             <h3>⚠️ DANGER ZONE - Delete Data</h3>
                             <div class="danger-btn-group">
@@ -1582,6 +1621,9 @@
             document.querySelectorAll('.tab-btn').forEach(btn => {
                 btn.onclick = () => { currentTab = btn.dataset.tab; renderAdminPanel(); };
             });
+            
+            // Manual Profit Processor button
+            document.getElementById('processAllProfitsBtn')?.addEventListener('click', processAllUsersProfit);
             
             // Danger Zone buttons
             document.getElementById('deleteAllUsersBtn')?.addEventListener('click', deleteAllUsers);

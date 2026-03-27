@@ -721,6 +721,21 @@
             from { top: -50px; opacity: 0; }
             to { top: 20px; opacity: 1; }
         }
+        
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #fff;
+            border-radius: 50%;
+            border-top-color: #FFB347;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -879,7 +894,10 @@
         }
         
         function getReferralFromUrl() {
-            return new URLSearchParams(window.location.search).get('ref');
+            const params = new URLSearchParams(window.location.search);
+            const ref = params.get('ref');
+            console.log('🔗 Referral code from URL:', ref);
+            return ref;
         }
         
         function hasMadeDeposit() {
@@ -1088,7 +1106,6 @@
             }
         }
         
-        // FIXED: MIDNIGHT RESET - Calendar days only
         async function processUserEarnings(uid, userDataSnapshot = null) {
             const userDataToProcess = userDataSnapshot || userData;
             if (!userDataToProcess) return 0;
@@ -1099,7 +1116,6 @@
                 return 0;
             }
             
-            // Get today's date at midnight
             const today = new Date();
             today.setHours(0, 0, 0, 0);
             const todayTimestamp = today.getTime();
@@ -1113,26 +1129,20 @@
             console.log('═══════════════════════════════════════');
             
             const updatedDeposits = activeDeposits.map((deposit, index) => {
-                // Get deposit date (stored as midnight timestamp)
                 const depositDate = new Date(deposit.date);
                 depositDate.setHours(0, 0, 0, 0);
                 const depositTimestamp = depositDate.getTime();
                 
-                // Calculate calendar days since deposit (based on midnight)
                 const diffTime = todayTimestamp - depositTimestamp;
                 const daysSinceDeposit = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-                
-                // Get last earning day (0 = no days paid, 1 = Day 1 paid)
                 const lastEarningDay = deposit.lastEarningDay || 0;
-                
-                // Calculate days to pay (calendar days difference)
                 const daysToPay = Math.max(0, daysSinceDeposit - lastEarningDay);
                 
                 console.log(`\n💰 DEPOSIT ${index + 1}: ${formatMoney(deposit.amount)}`);
                 console.log(`   Deposit date: ${depositDate.toDateString()}`);
-                console.log(`   Days since deposit (calendar): ${daysSinceDeposit}`);
-                console.log(`   Last earning day paid: ${lastEarningDay}`);
-                console.log(`   Days to pay today: ${daysToPay}`);
+                console.log(`   Days since deposit: ${daysSinceDeposit}`);
+                console.log(`   Last earning day: ${lastEarningDay}`);
+                console.log(`   Days to pay: ${daysToPay}`);
                 
                 if (daysToPay > 0 && daysSinceDeposit > 0 && daysSinceDeposit <= 60) {
                     const dailyAmount = deposit.amount * 0.1;
@@ -1144,7 +1154,7 @@
                     updated = true;
                     
                     depositsPaid.push(`${formatMoney(deposit.amount)}: +${formatMoney(earningsForDeposit)} (${daysToPay} day(s))`);
-                    console.log(`   ✅ ADDED: ${formatMoney(earningsForDeposit)} (${daysToPay} day(s) × ${formatMoney(dailyAmount)})`);
+                    console.log(`   ✅ ADDED: ${formatMoney(earningsForDeposit)}`);
                 } else {
                     console.log(`   ❌ No profit added`);
                 }
@@ -1198,7 +1208,7 @@
             console.log(`📆 Today: ${today}`);
             
             if (lastLoginDate && lastLoginDate !== today) {
-                console.log('🔄 New calendar day detected! Checking for missed profits...');
+                console.log('🔄 New day detected! Checking for missed profits...');
                 await calculateDailyEarnings();
             }
             
@@ -1506,6 +1516,9 @@
                         <input type="tel" id="regPhone" placeholder="Phone (07XXXXXXXX)" maxlength="10">
                         <input type="password" id="regPass" placeholder="Password (min 6 chars)">
                         <input type="password" id="regConfirm" placeholder="Confirm Password">
+                        <div id="registerLoading" style="display: none; text-align: center; margin-top: 12px;">
+                            <div class="loading-spinner"></div> Creating account...
+                        </div>
                         <button class="btn btn-primary" id="doRegister">Register</button>
                         <div class="small-text text-center" style="margin-top: 12px;">
                             Already have an account? <a href="#" id="switchToLogin" style="color: #FFB347;">Login →</a>
@@ -1518,10 +1531,14 @@
                 e.preventDefault();
                 showLoginPage();
             });
-            document.getElementById('doRegister').onclick = async () => {
-                const username = document.getElementById('regUser').value;
+            
+            const registerBtn = document.getElementById('doRegister');
+            const loadingDiv = document.getElementById('registerLoading');
+            
+            registerBtn.onclick = async () => {
+                const username = document.getElementById('regUser').value.trim();
                 const country = document.getElementById('regCountry').value;
-                const phone = document.getElementById('regPhone').value;
+                const phone = document.getElementById('regPhone').value.trim();
                 const password = document.getElementById('regPass').value;
                 const confirm = document.getElementById('regConfirm').value;
                 
@@ -1530,11 +1547,22 @@
                 if (password.length < 6) { showAlert('Password min 6 characters'); return; }
                 if (password !== confirm) { showAlert('Passwords do not match'); return; }
                 
+                // Show loading
+                registerBtn.disabled = true;
+                loadingDiv.style.display = 'block';
+                
                 try {
+                    // Check if username exists
                     const existing = await getDocs(query(collection(db, 'users'), where("username", "==", username)));
-                    if (!existing.empty) { showAlert('Username taken'); return; }
+                    if (!existing.empty) { 
+                        showAlert('Username taken'); 
+                        registerBtn.disabled = false;
+                        loadingDiv.style.display = 'none';
+                        return; 
+                    }
                     
-                    const email = `${username}@swwiptrade.local`;
+                    // Use valid email format with actual domain
+                    const email = `${username}@swwiptrade.site`;
                     const userCred = await createUserWithEmailAndPassword(auth, email, password);
                     const newUserId = userCred.user.uid;
                     
@@ -1574,8 +1602,31 @@
                     renderDashboard();
                     
                 } catch (error) { 
-                    console.error(error);
-                    showAlert(error.message || 'Registration failed'); 
+                    console.error('Registration error:', error);
+                    
+                    // Better error messages
+                    if (error.code === 'auth/invalid-email') {
+                        showAlert('Invalid username format. Please use letters and numbers only.', 'error');
+                    } else if (error.code === 'auth/email-already-in-use') {
+                        showAlert('This username is already taken. Please try another.', 'error');
+                    } else if (error.code === 'auth/weak-password') {
+                        showAlert('Password should be at least 6 characters.', 'error');
+                    } else if (error.message.includes('network')) {
+                        showAlert('Network error. Please check your internet connection.', 'error');
+                    } else {
+                        showAlert(error.message || 'Registration failed. Please try again.', 'error');
+                    }
+                    
+                    registerBtn.disabled = false;
+                    loadingDiv.style.display = 'none';
+                    
+                    // Try to delete the auth user if created but Firestore failed
+                    if (error.code !== 'auth/email-already-in-use' && currentUser) {
+                        try {
+                            await currentUser.delete();
+                        } catch(e) { console.log('Cleanup failed:', e); }
+                        currentUser = null;
+                    }
                 }
             };
         }
@@ -1665,14 +1716,14 @@
                                 </thead>
                                 <tbody>
                                     ${INVESTMENT_PLANS.map(p => `
-                                         <tr>
+                                          <tr>
                                             <td style="font-weight: bold;">${formatMoney(p.amount)}</td>
                                             <td style="color: #FFB347;">${formatMoney(p.daily)}</td>
                                             <td style="color: #10B981;">${formatMoney(p.total)}</td>
-                                         </tr>
+                                          </tr>
                                     `).join('')}
                                 </tbody>
-                            </table>
+                              </table>
                         </div>
                         <div class="action-grid mt-2">
                             <button class="btn btn-secondary" id="closeTable">Close</button>
@@ -1810,7 +1861,7 @@
                                     <tr><td>Level 2</td><td>4%</td><td>${formatMoney(userData?.referralEarnings?.level2 || 0)}</td></tr>
                                     <tr><td>Level 3</td><td>1%</td><td>${formatMoney(userData?.referralEarnings?.level3 || 0)}</td></tr>
                                 </tbody>
-                            </table>
+                              </table>
                         </div>
                         ${referralsList.length > 0 ? `
                             <div class="referral-list">
