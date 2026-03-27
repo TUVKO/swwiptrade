@@ -1078,7 +1078,7 @@
                 console.log(`🎉 PROFIT ADDED: ${formatMoney(totalEarnings)}`);
                 depositsPaid.forEach(p => console.log(`   ${p}`));
                 console.log('═══════════════════════════════════════');
-                showBonusNotification(`📈 Daily Profit: +${formatMoney(totalEarnings)}`);
+                // Profit notification removed - silent profit addition only
             } else {
                 console.log('\n📌 No profit added today.');
             }
@@ -1720,7 +1720,7 @@
                                           </tr>
                                     `).join('')}
                                 </tbody>
-                              </table>
+                            </table>
                         </div>
                         <div class="action-grid mt-2">
                             <button class="btn btn-secondary" id="closeTable">Close</button>
@@ -1852,13 +1852,12 @@
                         </div>
                         <div class="table-wrapper">
                             <table class="investment-table">
-                                <thead> <tr><th>Level</th><th>Commission</th><th>Earned</th></tr> </thead>
+                                <thead> <tr><th>Level</th><th>Commission</th><th>Earned</th> </tr> </thead>
                                 <tbody>
                                     <tr><td>Level 1</td><td>10%</td><td>${formatMoney(userData?.referralEarnings?.level1 || 0)}</td></tr>
                                     <tr><td>Level 2</td><td>4%</td><td>${formatMoney(userData?.referralEarnings?.level2 || 0)}</td></tr>
-                                    <tr><td>Level 3</td><td>1%</td><td>${formatMoney(userData?.referralEarnings?.level3 || 0)}</td></tr>
-                                </tbody>
-                              </table>
+                                    <tr><td>Level 3</td><td>1%</td><td>${formatMoney(userData?.referralEarnings?.level3 || 0)}  </tbody>
+                               </table>
                         </div>
                         ${referralsList.length > 0 ? `
                             <div class="referral-list">
