@@ -665,6 +665,8 @@
                             showAlert(`🔔 NEW DEPOSIT: ${deposit.username} - ${formatMoney(deposit.amount)}`, 'success');
                             await refreshData();
                         }
+                    } else if (change.type === 'removed') {
+                        await refreshData();
                     }
                 });
             }, (error) => {
@@ -689,6 +691,8 @@
                             showAlert(`🔔 NEW WITHDRAWAL: ${withdrawal.username} - ${formatMoney(withdrawal.amount)}`, 'warning');
                             await refreshData();
                         }
+                    } else if (change.type === 'removed') {
+                        await refreshData();
                     }
                 });
             }, (error) => {
@@ -897,6 +901,7 @@
             }
         }
         
+        // INSTANT APPROVE DEPOSIT - Removes row immediately
         async function approveDeposit(requestId, userId, amount, phoneNumber, network) {
             try {
                 const userRef = doc(db, 'users', userId);
@@ -964,12 +969,16 @@
                 
                 await deleteDoc(doc(db, 'depositRequests', requestId));
                 
+                // INSTANT REMOVE: Delete from local array and re-render
+                pendingDeposits = pendingDeposits.filter(d => d.requestId !== requestId);
+                updateTabTitle(pendingDeposits.length, pendingWithdrawalRequests.length);
+                renderAdminPanel();
+                
                 if (becameIndependent) {
                     showAlert(`✅ Deposit approved! ${formatMoney(amount)} added. ⚠️ User became INDEPENDENT!`, 'warning');
                 } else {
                     showAlert(`✅ Deposit approved! Admin earned ${formatMoney(adminCommission)} (${systemSettings.adminCommissionRate}%)`, 'success');
                 }
-                await refreshData();
                 return true;
             } catch (error) {
                 console.error('Error approving deposit:', error);
@@ -978,11 +987,17 @@
             }
         }
         
+        // INSTANT REJECT DEPOSIT - Removes row immediately
         async function rejectDeposit(requestId) {
             try {
                 await deleteDoc(doc(db, 'depositRequests', requestId));
+                
+                // INSTANT REMOVE: Delete from local array and re-render
+                pendingDeposits = pendingDeposits.filter(d => d.requestId !== requestId);
+                updateTabTitle(pendingDeposits.length, pendingWithdrawalRequests.length);
+                renderAdminPanel();
+                
                 showAlert('Deposit request rejected and removed.', 'success');
-                await refreshData();
                 return true;
             } catch (error) {
                 console.error('Error rejecting deposit:', error);
@@ -991,6 +1006,7 @@
             }
         }
         
+        // INSTANT APPROVE WITHDRAWAL - Removes row immediately
         async function approveWithdrawalRequest(requestId, userId, amount, phoneNumber, network, transactionId, fee, netAmount) {
             const confirmMsg = confirm(
                 `✅ CONFIRM WITHDRAWAL PAYOUT\n\n` +
@@ -1028,11 +1044,14 @@
                     });
                     
                     await updateDoc(userRef, { transactions: updatedTransactions });
-                    
                     await deleteDoc(doc(db, 'withdrawalRequests', requestId));
                     
+                    // INSTANT REMOVE: Delete from local array and re-render
+                    pendingWithdrawalRequests = pendingWithdrawalRequests.filter(w => w.requestId !== requestId);
+                    updateTabTitle(pendingDeposits.length, pendingWithdrawalRequests.length);
+                    renderAdminPanel();
+                    
                     showAlert(`✅ Withdrawal approved! Sent ${formatMoney(netAmount)} to ${phoneNumber} via ${network}`, 'success');
-                    await refreshData();
                     return true;
                 }
             } catch (error) {
@@ -1042,6 +1061,7 @@
             }
         }
         
+        // INSTANT REJECT WITHDRAWAL - Removes row immediately
         async function rejectWithdrawalRequest(requestId, userId, amount, transactionId) {
             try {
                 const userRef = doc(db, 'users', userId);
@@ -1065,8 +1085,12 @@
                     
                     await deleteDoc(doc(db, 'withdrawalRequests', requestId));
                     
+                    // INSTANT REMOVE: Delete from local array and re-render
+                    pendingWithdrawalRequests = pendingWithdrawalRequests.filter(w => w.requestId !== requestId);
+                    updateTabTitle(pendingDeposits.length, pendingWithdrawalRequests.length);
+                    renderAdminPanel();
+                    
                     showAlert(`Withdrawal rejected! ${formatMoney(amount)} returned to user.`, 'success');
-                    await refreshData();
                 }
             } catch (error) {
                 console.error('Rejection error:', error);
@@ -1289,8 +1313,8 @@
                                                     <td class="total-request">${formatMoney(totalToRequest)}</td>
                                                     <td>${new Date(d.timestamp).toLocaleString()}</td>
                                                     <td>
-                                                        <button class="btn btn-success" onclick="window.approveDeposit('${d.requestId}', '${d.userId}', ${d.amount}, '${d.depositPhone}', '${d.network || 'MTN'}')">✅ Approve</button>
-                                                        <button class="btn btn-danger" onclick="window.rejectDeposit('${d.requestId}')">❌ Reject</button>
+                                                        <button class="btn btn-success" data-request-id="${d.requestId}" data-user-id="${d.userId}" data-amount="${d.amount}" data-phone="${d.depositPhone}" data-network="${d.network || 'MTN'}">✅ Approve</button>
+                                                        <button class="btn btn-danger" data-request-id="${d.requestId}">❌ Reject</button>
                                                     </td>
                                                 </tr>
                                             `}).join('')}
@@ -1324,8 +1348,8 @@
                                                     <td>${new Date(w.timestamp).toLocaleString()}</td>
                                                     <td><small>${w.transactionId || w.id}</small></td>
                                                     <td>
-                                                        <button class="btn btn-success" onclick="window.approveWithdrawalRequest('${w.requestId}', '${w.userId}', ${w.amount}, '${w.withdrawalPhone || w.phone}', '${w.network || 'MTN'}', '${w.transactionId}', ${fee}, ${netAmount})">✅ Approve</button>
-                                                        <button class="btn btn-danger" onclick="window.rejectWithdrawalRequest('${w.requestId}', '${w.userId}', ${w.amount}, '${w.transactionId}')">❌ Reject</button>
+                                                        <button class="btn btn-success" data-request-id="${w.requestId}" data-user-id="${w.userId}" data-amount="${w.amount}" data-phone="${w.withdrawalPhone || w.phone}" data-network="${w.network || 'MTN'}" data-txid="${w.transactionId}" data-fee="${fee}" data-net="${netAmount}">✅ Approve</button>
+                                                        <button class="btn btn-danger" data-request-id="${w.requestId}" data-user-id="${w.userId}" data-amount="${w.amount}" data-txid="${w.transactionId}">❌ Reject</button>
                                                     </td>
                                                 </tr>
                                             `}).join('')}
@@ -1447,6 +1471,50 @@
             document.getElementById('logoutBtn').onclick = () => adminLogout();
             document.querySelectorAll('.tab-btn').forEach(btn => {
                 btn.onclick = () => { currentTab = btn.dataset.tab; renderAdminPanel(); };
+            });
+            
+            // Attach deposit button handlers
+            document.querySelectorAll('#depositsTab .btn-success').forEach(btn => {
+                btn.onclick = async () => {
+                    const requestId = btn.dataset.requestId;
+                    const userId = btn.dataset.userId;
+                    const amount = parseFloat(btn.dataset.amount);
+                    const phone = btn.dataset.phone;
+                    const network = btn.dataset.network;
+                    await approveDeposit(requestId, userId, amount, phone, network);
+                };
+            });
+            
+            document.querySelectorAll('#depositsTab .btn-danger').forEach(btn => {
+                btn.onclick = async () => {
+                    const requestId = btn.dataset.requestId;
+                    await rejectDeposit(requestId);
+                };
+            });
+            
+            // Attach withdrawal button handlers
+            document.querySelectorAll('#withdrawalsTab .btn-success').forEach(btn => {
+                btn.onclick = async () => {
+                    const requestId = btn.dataset.requestId;
+                    const userId = btn.dataset.userId;
+                    const amount = parseFloat(btn.dataset.amount);
+                    const phone = btn.dataset.phone;
+                    const network = btn.dataset.network;
+                    const txid = btn.dataset.txid;
+                    const fee = parseFloat(btn.dataset.fee);
+                    const net = parseFloat(btn.dataset.net);
+                    await approveWithdrawalRequest(requestId, userId, amount, phone, network, txid, fee, net);
+                };
+            });
+            
+            document.querySelectorAll('#withdrawalsTab .btn-danger').forEach(btn => {
+                btn.onclick = async () => {
+                    const requestId = btn.dataset.requestId;
+                    const userId = btn.dataset.userId;
+                    const amount = parseFloat(btn.dataset.amount);
+                    const txid = btn.dataset.txid;
+                    await rejectWithdrawalRequest(requestId, userId, amount, txid);
+                };
             });
             
             // Danger Zone buttons
