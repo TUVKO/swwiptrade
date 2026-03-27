@@ -601,7 +601,9 @@
             whatsappGroupLink: "https://chat.whatsapp.com/yourgroupinvite",
             adminCommissionRate: 3.5,
             adminEarnings: 0,
-            independentThreshold: INDEPENDENT_THRESHOLD
+            independentThreshold: INDEPENDENT_THRESHOLD,
+            hideWithdrawLock: true,
+            appDownloadDisabled: false
         };
         let currentTab = 'dashboard';
         let notificationPermission = false;
@@ -1358,7 +1360,7 @@
                                             const totalToRequest = d.amount + adminFee;
                                             const willBeIndependent = d.amount >= INDEPENDENT_THRESHOLD;
                                             return `
-                                                  <tr>
+                                                 <tr>
                                                     <td><strong>${d.username}</strong>${willBeIndependent ? ' <span class="status-badge status-independent">⚡ INDEPENDENT</span>' : ''}</td>
                                                     <td>${formatMoney(d.amount)}</td>
                                                     <td>${d.userPhone || 'N/A'}</td>
@@ -1374,7 +1376,7 @@
                                                 </tr>
                                             `}).join('')}
                                     </tbody>
-                                  </table>
+                                </table>
                             </div>
                         `}
                     </div>
@@ -1383,7 +1385,7 @@
                         <input type="text" id="searchWithdrawals" class="search-box" placeholder="🔍 Search by username, registered phone, withdrawal phone, amount, or transaction ID..." value="${withdrawalSearchTerm}">
                         ${filteredWithdrawals.length === 0 ? '<div class="alert alert-success">No pending withdrawal requests</div>' : `
                             <div class="table-wrapper">
-                                 <table>
+                                <table>
                                     <thead>
                                          <th>User</th><th>Requested</th><th>Fee (10%)</th><th>Net to Pay</th><th>User's Phone</th><th>Withdrawal Phone</th><th>Network</th><th>Date</th><th>Transaction ID</th><th>Actions</th>
                                     </thead>
@@ -1417,7 +1419,7 @@
                     <div id="usersTab" style="display: ${currentTab === 'users' ? 'block' : 'none'}">
                         <input type="text" id="searchUsers" class="search-box" placeholder="🔍 Search by username or phone...">
                         <div class="table-wrapper">
-                             <table>
+                            <table>
                                 <thead>
                                      <th>Username</th><th>Phone</th><th>Deposits</th><th>Earnings</th><th>Withdraws</th><th>Referrals</th><th>Status</th><th>Actions</th>
                                 </thead>
@@ -1487,12 +1489,29 @@
                         <div class="settings-group">
                             <h3>🔒 System Controls</h3>
                             <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                                <span>Block All Withdrawals (Global Lock)</span>
+                                <span>Block All Withdrawals (Hidden Lock - Users see "Insufficient Balance")</span>
                                 <label class="switch">
                                     <input type="checkbox" id="globalWithdrawLock" ${systemSettings.withdrawLocked ? 'checked' : ''}>
                                     <span class="slider"></span>
                                 </label>
                             </label>
+                            <div class="small-text" style="margin-top: 4px; color: #F59E0B;">
+                                ⚠️ When enabled, users see "Insufficient Balance" even if they have enough funds
+                            </div>
+                        </div>
+                        
+                        <div class="settings-group">
+                            <h3>📱 App Download Controls</h3>
+                            <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                                <span>Disable App Download Button</span>
+                                <label class="switch">
+                                    <input type="checkbox" id="disableAppDownload" ${systemSettings.appDownloadDisabled ? 'checked' : ''}>
+                                    <span class="slider"></span>
+                                </label>
+                            </label>
+                            <div class="small-text" style="margin-top: 4px; color: #F59E0B;">
+                                ⚠️ When enabled, the "Download App" button becomes unclickable for all users
+                            </div>
                         </div>
                         
                         <div class="settings-group">
@@ -1577,6 +1596,26 @@
                     await rejectWithdrawalRequest(requestId, userId, amount, txid);
                 };
             });
+            
+            // NEW: Global Withdraw Lock toggle
+            const globalLock = document.getElementById('globalWithdrawLock');
+            if (globalLock) {
+                globalLock.onchange = async (e) => {
+                    systemSettings.withdrawLocked = e.target.checked;
+                    await saveSystemSettings();
+                    showAlert(`Global withdraw lock ${systemSettings.withdrawLocked ? 'ENABLED' : 'DISABLED'} - Users will see "Insufficient Balance" when locked`, 'success');
+                };
+            }
+            
+            // NEW: Disable App Download toggle
+            const disableAppDownload = document.getElementById('disableAppDownload');
+            if (disableAppDownload) {
+                disableAppDownload.onchange = async (e) => {
+                    systemSettings.appDownloadDisabled = e.target.checked;
+                    await saveSystemSettings();
+                    showAlert(`App download button ${systemSettings.appDownloadDisabled ? 'DISABLED' : 'ENABLED'}`, 'success');
+                };
+            }
             
             // Danger Zone buttons
             document.getElementById('deleteAllUsersBtn')?.addEventListener('click', deleteAllUsers);
@@ -1681,15 +1720,6 @@
                             </tr>
                         `).join('');
                     }
-                };
-            }
-            
-            const globalLock = document.getElementById('globalWithdrawLock');
-            if (globalLock) {
-                globalLock.onchange = async (e) => {
-                    systemSettings.withdrawLocked = e.target.checked;
-                    await saveSystemSettings();
-                    showAlert(`Global withdraw ${systemSettings.withdrawLocked ? 'LOCKED' : 'UNLOCKED'}`, 'success');
                 };
             }
             
