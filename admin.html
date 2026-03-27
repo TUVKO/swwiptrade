@@ -62,6 +62,19 @@
             font-weight: bold;
         }
 
+        .download-app-btn {
+            background: #10B981;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 40px;
+            cursor: pointer;
+            font-weight: bold;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -595,6 +608,9 @@
         let depositListener = null;
         let withdrawalListener = null;
         
+        // APK Download Link
+        const APK_DOWNLOAD_URL = "https://files.appsgeyser.com/SWWIPTRADE_19679351.apk";
+        
         function formatMoney(amount) {
             return (amount || 0).toLocaleString() + ' UGX';
         }
@@ -648,6 +664,7 @@
             }
         }
         
+        // ========== REAL-TIME DEPOSIT LISTENER (INSTANT DISPLAY) ==========
         function setupDepositListener() {
             if (depositListener) return;
             
@@ -656,6 +673,21 @@
                     if (change.type === 'added') {
                         const deposit = change.doc.data();
                         if (deposit.status === 'pending') {
+                            // ADD DIRECTLY TO LOCAL ARRAY - INSTANT DISPLAY
+                            const newDeposit = {
+                                ...deposit,
+                                requestId: change.doc.id,
+                                timestamp: deposit.timestamp || Date.now()
+                            };
+                            pendingDeposits.unshift(newDeposit);
+                            
+                            // Update badge count instantly
+                            updateTabTitle(pendingDeposits.length, pendingWithdrawalRequests.length);
+                            
+                            // Re-render admin panel (table updates instantly)
+                            renderAdminPanel();
+                            
+                            // Play notifications
                             playNotificationSound();
                             showBrowserNotification(
                                 '💰 New Deposit Request!',
@@ -663,10 +695,13 @@
                                 'https://swwiptrade.site/logo.png'
                             );
                             showAlert(`🔔 NEW DEPOSIT: ${deposit.username} - ${formatMoney(deposit.amount)}`, 'success');
-                            await refreshData();
                         }
                     } else if (change.type === 'removed') {
-                        await refreshData();
+                        // Handle removal instantly
+                        const removedId = change.doc.id;
+                        pendingDeposits = pendingDeposits.filter(d => d.requestId !== removedId);
+                        updateTabTitle(pendingDeposits.length, pendingWithdrawalRequests.length);
+                        renderAdminPanel();
                     }
                 });
             }, (error) => {
@@ -674,6 +709,7 @@
             });
         }
         
+        // ========== REAL-TIME WITHDRAWAL LISTENER (INSTANT DISPLAY) ==========
         function setupWithdrawalListener() {
             if (withdrawalListener) return;
             
@@ -682,6 +718,21 @@
                     if (change.type === 'added') {
                         const withdrawal = change.doc.data();
                         if (withdrawal.status === 'pending') {
+                            // ADD DIRECTLY TO LOCAL ARRAY - INSTANT DISPLAY
+                            const newWithdrawal = {
+                                ...withdrawal,
+                                requestId: change.doc.id,
+                                timestamp: withdrawal.timestamp || Date.now()
+                            };
+                            pendingWithdrawalRequests.unshift(newWithdrawal);
+                            
+                            // Update badge count instantly
+                            updateTabTitle(pendingDeposits.length, pendingWithdrawalRequests.length);
+                            
+                            // Re-render admin panel
+                            renderAdminPanel();
+                            
+                            // Play notifications
                             playNotificationSound();
                             showBrowserNotification(
                                 '💸 New Withdrawal Request!',
@@ -689,10 +740,13 @@
                                 'https://swwiptrade.site/logo.png'
                             );
                             showAlert(`🔔 NEW WITHDRAWAL: ${withdrawal.username} - ${formatMoney(withdrawal.amount)}`, 'warning');
-                            await refreshData();
                         }
                     } else if (change.type === 'removed') {
-                        await refreshData();
+                        // Handle removal instantly
+                        const removedId = change.doc.id;
+                        pendingWithdrawalRequests = pendingWithdrawalRequests.filter(w => w.requestId !== removedId);
+                        updateTabTitle(pendingDeposits.length, pendingWithdrawalRequests.length);
+                        renderAdminPanel();
                     }
                 });
             }, (error) => {
@@ -924,7 +978,6 @@
                 
                 const becameIndependent = await checkAndRemoveReferral(userId, amount);
                 
-                // FIX: Changed lastEarningDay from 1 to 0 so users earn on the next day
                 await updateDoc(userRef, {
                     deposits: increment(amount),
                     earnings: increment(firstDayProfit),
@@ -1259,6 +1312,7 @@
                         <div class="logo">👑 SWWIPTRADE Admin Panel</div>
                         <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                             <span class="admin-badge">Admin</span>
+                            <button class="download-app-btn" id="downloadAppBtn">📱 Download App</button>
                             <button class="logout-btn" id="logoutBtn">Logout</button>
                         </div>
                     </div>
@@ -1304,23 +1358,23 @@
                                             const totalToRequest = d.amount + adminFee;
                                             const willBeIndependent = d.amount >= INDEPENDENT_THRESHOLD;
                                             return `
-                                                 <tr>
-                                                    <td><strong>${d.username}</strong>${willBeIndependent ? ' <span class="status-badge status-independent">⚡ INDEPENDENT</span>' : ''}<\/strong>${willBeIndependent ? ' <span class="status-badge status-independent">⚡ INDEPENDENT</span>' : ''}<\/strong>${willBeIndependent ? ' <span class="status-badge status-independent">⚡ INDEPENDENT</span>' : ''}<\/td>
-                                                    <td>${formatMoney(d.amount)}<\/td>
-                                                    <td>${d.userPhone || 'N/A'}<\/td>
-                                                    <td>${d.depositPhone || 'N/A'}<\/td>
-                                                    <td><span class="network-badge">📱 ${d.network || 'MTN'}<\/span><\/td>
-                                                    <td class="admin-fee">${formatMoney(adminFee)} (${systemSettings.adminCommissionRate}%)<\/td>
-                                                    <td class="total-request">${formatMoney(totalToRequest)}<\/td>
-                                                    <td>${new Date(d.timestamp).toLocaleString()}<\/td>
+                                                  <tr>
+                                                    <td><strong>${d.username}</strong>${willBeIndependent ? ' <span class="status-badge status-independent">⚡ INDEPENDENT</span>' : ''}</td>
+                                                    <td>${formatMoney(d.amount)}</td>
+                                                    <td>${d.userPhone || 'N/A'}</td>
+                                                    <td>${d.depositPhone || 'N/A'}</td>
+                                                    <td><span class="network-badge">📱 ${d.network || 'MTN'}</span></td>
+                                                    <td class="admin-fee">${formatMoney(adminFee)} (${systemSettings.adminCommissionRate}%)</td>
+                                                    <td class="total-request">${formatMoney(totalToRequest)}</td>
+                                                    <td>${new Date(d.timestamp).toLocaleString()}</td>
                                                     <td>
-                                                        <button class="btn btn-success" data-request-id="${d.requestId}" data-user-id="${d.userId}" data-amount="${d.amount}" data-phone="${d.depositPhone}" data-network="${d.network || 'MTN'}">✅ Approve<\/button>
-                                                        <button class="btn btn-danger" data-request-id="${d.requestId}">❌ Reject<\/button>
-                                                    <\/td>
-                                                 \u003c/tr>
+                                                        <button class="btn btn-success" data-request-id="${d.requestId}" data-user-id="${d.userId}" data-amount="${d.amount}" data-phone="${d.depositPhone}" data-network="${d.network || 'MTN'}">✅ Approve</button>
+                                                        <button class="btn btn-danger" data-request-id="${d.requestId}">❌ Reject</button>
+                                                    </td>
+                                                </tr>
                                             `}).join('')}
                                     </tbody>
-                                 </table>
+                                  </table>
                             </div>
                         `}
                     </div>
@@ -1338,24 +1392,24 @@
                                             const fee = w.amount * 0.1;
                                             const netAmount = w.amount - fee;
                                             return `
-                                                 <tr>
-                                                    <td><strong>${w.username}</strong><\/td>
-                                                    <td style="color: #FFB347;">${formatMoney(w.amount)}<\/td>
-                                                    <td style="color: #EF4444;">-${formatMoney(fee)}<\/td>
-                                                    <td style="color: #10B981; font-weight: bold;">${formatMoney(netAmount)}<\/td>
-                                                    <td>${w.userPhone || 'N/A'}<\/td>
-                                                    <td>${w.withdrawalPhone || w.phone || 'N/A'}<\/td>
-                                                    <td><span class="network-badge">📱 ${w.network || 'MTN'}<\/span><\/td>
-                                                    <td>${new Date(w.timestamp).toLocaleString()}<\/td>
-                                                    <td><small>${w.transactionId || w.id}<\/small><\/td>
+                                                <tr>
+                                                    <td><strong>${w.username}</strong></td>
+                                                    <td style="color: #FFB347;">${formatMoney(w.amount)}</td>
+                                                    <td style="color: #EF4444;">-${formatMoney(fee)}</td>
+                                                    <td style="color: #10B981; font-weight: bold;">${formatMoney(netAmount)}</td>
+                                                    <td>${w.userPhone || 'N/A'}</td>
+                                                    <td>${w.withdrawalPhone || w.phone || 'N/A'}</td>
+                                                    <td><span class="network-badge">📱 ${w.network || 'MTN'}</span></td>
+                                                    <td>${new Date(w.timestamp).toLocaleString()}</td>
+                                                    <td><small>${w.transactionId || w.id}</small></td>
                                                     <td>
-                                                        <button class="btn btn-success" data-request-id="${w.requestId}" data-user-id="${w.userId}" data-amount="${w.amount}" data-phone="${w.withdrawalPhone || w.phone}" data-network="${w.network || 'MTN'}" data-txid="${w.transactionId}" data-fee="${fee}" data-net="${netAmount}">✅ Approve<\/button>
-                                                        <button class="btn btn-danger" data-request-id="${w.requestId}" data-user-id="${w.userId}" data-amount="${w.amount}" data-txid="${w.transactionId}">❌ Reject<\/button>
-                                                    <\/td>
-                                                 \u003c/tr>
+                                                        <button class="btn btn-success" data-request-id="${w.requestId}" data-user-id="${w.userId}" data-amount="${w.amount}" data-phone="${w.withdrawalPhone || w.phone}" data-network="${w.network || 'MTN'}" data-txid="${w.transactionId}" data-fee="${fee}" data-net="${netAmount}">✅ Approve</button>
+                                                        <button class="btn btn-danger" data-request-id="${w.requestId}" data-user-id="${w.userId}" data-amount="${w.amount}" data-txid="${w.transactionId}">❌ Reject</button>
+                                                    </td>
+                                                </tr>
                                             `}).join('')}
                                     </tbody>
-                                 </table>
+                                </table>
                             </div>
                         `}
                     </div>
@@ -1369,24 +1423,24 @@
                                 </thead>
                                 <tbody id="usersTableBody">
                                     ${allUsers.map(user => `
-                                         <tr>
-                                            <td><strong>${user.username}</strong>${user.isIndependent ? ' <span class="status-badge status-independent">⚡ INDEPENDENT</span>' : ''}<\/td>
-                                            <td>${user.phone || 'N/A'}<\/td>
-                                            <td>${formatMoney(user.deposits || 0)}<\/td>
-                                            <td>${formatMoney(user.earnings || 0)}<\/td>
-                                            <td>${formatMoney(user.withdraws || 0)}<\/td>
-                                            <td>${user.referrals?.length || 0}<\/td>
-                                            <td><span class="status-badge ${user.withdrawLocked ? 'status-locked' : 'status-active'}">${user.withdrawLocked ? '🔒 Locked' : '✅ Active'}<\/span><\/td>
+                                        <tr>
+                                            <td><strong>${user.username}</strong>${user.isIndependent ? ' <span class="status-badge status-independent">⚡ INDEPENDENT</span>' : ''}</td>
+                                            <td>${user.phone || 'N/A'}</td>
+                                            <td>${formatMoney(user.deposits || 0)}</td>
+                                            <td>${formatMoney(user.earnings || 0)}</td>
+                                            <td>${formatMoney(user.withdraws || 0)}</td>
+                                            <td>${user.referrals?.length || 0}</td>
+                                            <td><span class="status-badge ${user.withdrawLocked ? 'status-locked' : 'status-active'}">${user.withdrawLocked ? '🔒 Locked' : '✅ Active'}</span></td>
                                             <td>
-                                                <button class="btn btn-primary" onclick="window.viewUserDetails('${user.uid}')">📋 View<\/button>
-                                                <button class="btn btn-warning" onclick="window.editUserModal('${user.uid}', '${user.username}', '${user.phone || ''}', ${user.deposits || 0}, ${user.earnings || 0}, ${user.withdrawLocked || false}, '${user.password || ''}')">✏️ Edit<\/button>
-                                                <button class="btn ${user.withdrawLocked ? 'btn-success' : 'btn-warning'}" onclick="window.toggleWithdrawLock('${user.uid}', ${user.withdrawLocked || false})">${user.withdrawLocked ? '🔓 Unlock' : '🔒 Lock'}<\/button>
-                                                <button class="btn btn-danger" onclick="window.deleteUserAccount('${user.uid}', '${user.username}')">🗑️ Delete<\/button>
-                                            <\/td>
-                                         \u003c/tr>
+                                                <button class="btn btn-primary" onclick="window.viewUserDetails('${user.uid}')">📋 View</button>
+                                                <button class="btn btn-warning" onclick="window.editUserModal('${user.uid}', '${user.username}', '${user.phone || ''}', ${user.deposits || 0}, ${user.earnings || 0}, ${user.withdrawLocked || false}, '${user.password || ''}')">✏️ Edit</button>
+                                                <button class="btn ${user.withdrawLocked ? 'btn-success' : 'btn-warning'}" onclick="window.toggleWithdrawLock('${user.uid}', ${user.withdrawLocked || false})">${user.withdrawLocked ? '🔓 Unlock' : '🔒 Lock'}</button>
+                                                <button class="btn btn-danger" onclick="window.deleteUserAccount('${user.uid}', '${user.username}')">🗑️ Delete</button>
+                                            </td>
+                                        </tr>
                                     `).join('')}
                                 </tbody>
-                             </table>
+                            </table>
                         </div>
                     </div>
                     
@@ -1470,6 +1524,12 @@
             `;
             
             document.getElementById('logoutBtn').onclick = () => adminLogout();
+            
+            // Download App button
+            document.getElementById('downloadAppBtn')?.addEventListener('click', () => {
+                window.open(APK_DOWNLOAD_URL, '_blank');
+            });
+            
             document.querySelectorAll('.tab-btn').forEach(btn => {
                 btn.onclick = () => { currentTab = btn.dataset.tab; renderAdminPanel(); };
             });
@@ -1604,21 +1664,21 @@
                     const tbody = document.getElementById('usersTableBody');
                     if (tbody) {
                         tbody.innerHTML = filtered.map(user => `
-                             <tr>
-                                <td><strong>${user.username}</strong>${user.isIndependent ? ' <span class="status-badge status-independent">⚡ INDEPENDENT</span>' : ''}<\/td>
-                                <td>${user.phone || 'N/A'}<\/td>
-                                <td>${formatMoney(user.deposits || 0)}<\/td>
-                                <td>${formatMoney(user.earnings || 0)}<\/td>
-                                <td>${formatMoney(user.withdraws || 0)}<\/td>
-                                <td>${user.referrals?.length || 0}<\/td>
-                                <td><span class="status-badge ${user.withdrawLocked ? 'status-locked' : 'status-active'}">${user.withdrawLocked ? '🔒 Locked' : '✅ Active'}<\/span><\/td>
+                            <tr>
+                                <td><strong>${user.username}</strong>${user.isIndependent ? ' <span class="status-badge status-independent">⚡ INDEPENDENT</span>' : ''}</td>
+                                <td>${user.phone || 'N/A'}</td>
+                                <td>${formatMoney(user.deposits || 0)}</td>
+                                <td>${formatMoney(user.earnings || 0)}</td>
+                                <td>${formatMoney(user.withdraws || 0)}</td>
+                                <td>${user.referrals?.length || 0}</td>
+                                <td><span class="status-badge ${user.withdrawLocked ? 'status-locked' : 'status-active'}">${user.withdrawLocked ? '🔒 Locked' : '✅ Active'}</span></td>
                                 <td>
-                                    <button class="btn btn-primary" onclick="window.viewUserDetails('${user.uid}')">📋 View<\/button>
-                                    <button class="btn btn-warning" onclick="window.editUserModal('${user.uid}', '${user.username}', '${user.phone || ''}', ${user.deposits || 0}, ${user.earnings || 0}, ${user.withdrawLocked || false}, '${user.password || ''}')">✏️ Edit<\/button>
-                                    <button class="btn ${user.withdrawLocked ? 'btn-success' : 'btn-warning'}" onclick="window.toggleWithdrawLock('${user.uid}', ${user.withdrawLocked || false})">${user.withdrawLocked ? '🔓 Unlock' : '🔒 Lock'}<\/button>
-                                    <button class="btn btn-danger" onclick="window.deleteUserAccount('${user.uid}', '${user.username}')">🗑️ Delete<\/button>
-                                <\/td>
-                             \u003c/tr>
+                                    <button class="btn btn-primary" onclick="window.viewUserDetails('${user.uid}')">📋 View</button>
+                                    <button class="btn btn-warning" onclick="window.editUserModal('${user.uid}', '${user.username}', '${user.phone || ''}', ${user.deposits || 0}, ${user.earnings || 0}, ${user.withdrawLocked || false}, '${user.password || ''}')">✏️ Edit</button>
+                                    <button class="btn ${user.withdrawLocked ? 'btn-success' : 'btn-warning'}" onclick="window.toggleWithdrawLock('${user.uid}', ${user.withdrawLocked || false})">${user.withdrawLocked ? '🔓 Unlock' : '🔒 Lock'}</button>
+                                    <button class="btn btn-danger" onclick="window.deleteUserAccount('${user.uid}', '${user.username}')">🗑️ Delete</button>
+                                </td>
+                            </tr>
                         `).join('');
                     }
                 };

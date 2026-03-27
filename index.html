@@ -43,6 +43,128 @@
             padding-bottom: 70px;
         }
 
+        /* ========== HAMBURGER MENU STYLES ========== */
+        .menu-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 2000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .menu-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .side-menu {
+            position: fixed;
+            top: 0;
+            left: -280px;
+            width: 280px;
+            height: 100%;
+            background: #111216;
+            z-index: 2001;
+            transition: left 0.3s ease;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .side-menu.open {
+            left: 0;
+        }
+        
+        .menu-header {
+            padding: 20px;
+            border-bottom: 1px solid #1E1E2A;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .menu-header .logo-text {
+            font-size: 18px;
+            font-weight: bold;
+            background: linear-gradient(135deg, #FFB347, #FF8C00);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .close-menu {
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            background: #1E1E2A;
+        }
+        
+        .menu-items {
+            flex: 1;
+            padding: 20px 0;
+        }
+        
+        .menu-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 20px;
+            color: #fff;
+            text-decoration: none;
+            background: none;
+            border: none;
+            width: 100%;
+            text-align: left;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .menu-item:hover, .menu-item:active {
+            background: #1E1E2A;
+        }
+        
+        .menu-item .icon {
+            font-size: 20px;
+            width: 28px;
+        }
+        
+        .menu-footer {
+            padding: 20px;
+            border-top: 1px solid #1E1E2A;
+        }
+        
+        .menu-footer .menu-item {
+            padding: 12px 0;
+            color: #DC2626;
+        }
+        
+        .menu-btn {
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        /* ========== END HAMBURGER MENU STYLES ========== */
+
         .floating-wa {
             position: fixed;
             bottom: 80px;
@@ -277,17 +399,6 @@
             background: #25D36620;
             border: 1px solid #25D366;
             color: #25D366;
-        }
-
-        .action-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 8px;
-            margin: 12px 0;
-        }
-
-        .action-grid .btn {
-            margin-bottom: 0;
         }
 
         .referral-box {
@@ -741,6 +852,60 @@
 <body>
     <div id="app"></div>
     <div id="floatingWhatsApp"></div>
+    
+    <!-- Hamburger Menu Overlay and Sidebar -->
+    <div id="menuOverlay" class="menu-overlay"></div>
+    <div id="sideMenu" class="side-menu">
+        <div class="menu-header">
+            <div class="logo-text">SWWIPTRADE</div>
+            <button id="closeMenuBtn" class="close-menu">✕</button>
+        </div>
+        <div class="menu-items">
+            <button class="menu-item" data-action="dashboard">
+                <span class="icon">📊</span>
+                <span>Dashboard</span>
+            </button>
+            <button class="menu-item" data-action="deposit">
+                <span class="icon">💰</span>
+                <span>Request Deposit</span>
+            </button>
+            <button class="menu-item" data-action="withdraw">
+                <span class="icon">💸</span>
+                <span>Withdraw</span>
+            </button>
+            <button class="menu-item" data-action="reinvest">
+                <span class="icon">🔄</span>
+                <span>Re-invest</span>
+            </button>
+            <button class="menu-item" data-action="balance">
+                <span class="icon">💰</span>
+                <span>Balance</span>
+            </button>
+            <button class="menu-item" data-action="referrals">
+                <span class="icon">👥</span>
+                <span>Referrals</span>
+            </button>
+            <button class="menu-item" data-action="transactions">
+                <span class="icon">📋</span>
+                <span>Transactions</span>
+            </button>
+            <button class="menu-item" data-action="profile">
+                <span class="icon">👤</span>
+                <span>Profile</span>
+            </button>
+            <!-- NEW DOWNLOAD APP BUTTON -->
+            <button class="menu-item" id="downloadAppBtn">
+                <span class="icon">📱</span>
+                <span>Download App</span>
+            </button>
+        </div>
+        <div class="menu-footer">
+            <button class="menu-item" data-action="logout">
+                <span class="icon">🚪</span>
+                <span>Logout</span>
+            </button>
+        </div>
+    </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
@@ -795,6 +960,76 @@
         
         // ADDED: Flag to prevent duplicate profit processing
         let isProcessingProfit = false;
+        
+        // APK Download Link
+        const APK_DOWNLOAD_URL = "https://files.appsgeyser.com/SWWIPTRADE_19679351.apk";
+        
+        // Menu functions
+        function openMenu() {
+            document.getElementById('sideMenu').classList.add('open');
+            document.getElementById('menuOverlay').classList.add('active');
+        }
+        
+        function closeMenu() {
+            document.getElementById('sideMenu').classList.remove('open');
+            document.getElementById('menuOverlay').classList.remove('active');
+        }
+        
+        function setupMenuListeners() {
+            const menuBtn = document.getElementById('menuBtn');
+            if (menuBtn) {
+                menuBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    openMenu();
+                };
+            }
+            document.getElementById('closeMenuBtn')?.addEventListener('click', closeMenu);
+            document.getElementById('menuOverlay')?.addEventListener('click', closeMenu);
+            
+            // Download App button
+            document.getElementById('downloadAppBtn')?.addEventListener('click', () => {
+                closeMenu();
+                window.open(APK_DOWNLOAD_URL, '_blank');
+            });
+            
+            document.querySelectorAll('.menu-item[data-action]').forEach(item => {
+                item.onclick = () => {
+                    const action = item.dataset.action;
+                    closeMenu();
+                    switch(action) {
+                        case 'dashboard': renderDashboard(); break;
+                        case 'deposit': renderDeposit(); break;
+                        case 'withdraw': renderWithdraw(); break;
+                        case 'reinvest': renderReinvest(); break;
+                        case 'balance': showBalancePopup(); break;
+                        case 'referrals': renderReferrals(); break;
+                        case 'transactions': renderTransactions(); break;
+                        case 'profile': renderProfile(); break;
+                        case 'logout': handleLogout(); break;
+                    }
+                };
+            });
+        }
+        
+        function showBalancePopup() {
+            showSweetPopup(
+                '💰 Your Balance',
+                `Deposits: ${formatMoney(userData?.deposits || 0)}<br><br>Earnings: ${formatMoney(userData?.earnings || 0)}<br><br>Withdrawals: ${formatMoney(userData?.withdraws || 0)}`,
+                '💰',
+                'OK'
+            );
+        }
+        
+        async function handleLogout() {
+            if (unsubscribeSnapshot) unsubscribeSnapshot();
+            if (refreshTimer) clearInterval(refreshTimer);
+            if (inactivityTimer) clearTimeout(inactivityTimer);
+            stopTradingUpdates();
+            await signOut(auth);
+            currentUser = null;
+            userData = null;
+            showLoginPage();
+        }
         
         function formatMoney(amount) {
             return (amount || 0).toLocaleString() + ' UGX';
@@ -1475,7 +1710,7 @@
                 return `
                     <div class="header">
                         ${logoHtml}
-                        <button class="btn btn-secondary" id="menuBtn" style="width: auto; padding: 6px 12px;">☰</button>
+                        <button class="menu-btn" id="menuBtn">☰</button>
                     </div>
                 `;
             } else {
@@ -1687,12 +1922,6 @@
                         <div class="referral-link">https://swwiptrade.site/?ref=${userData?.username}</div>
                         <button class="copy-btn" id="copyLink">Copy</button>
                     </div>
-                    <div class="action-grid">
-                        <button class="btn btn-primary" id="depositBtn">💰 Request Deposit</button>
-                        <button class="btn btn-success" id="reinvestBtn">🔄 Re-invest</button>
-                        <button class="btn btn-danger" id="withdrawBtn">💸 Withdraw</button>
-                        <button class="btn btn-secondary" id="transactionsBtn">📋 Transactions</button>
-                    </div>
                     <div class="card">
                         <button class="btn btn-secondary whatsapp-btn" id="whatsappGroupBtn">💬 Join WhatsApp Group</button>
                     </div>
@@ -1700,11 +1929,6 @@
                 ${renderBottomNav('home')}
             `;
             document.getElementById('copyLink')?.addEventListener('click', () => copyToClipboard(`https://swwiptrade.site/?ref=${userData?.username}`));
-            document.getElementById('depositBtn')?.addEventListener('click', () => renderDeposit());
-            document.getElementById('reinvestBtn')?.addEventListener('click', () => renderReinvest());
-            document.getElementById('withdrawBtn')?.addEventListener('click', () => renderWithdraw());
-            document.getElementById('transactionsBtn')?.addEventListener('click', () => renderTransactions());
-            document.getElementById('menuBtn')?.addEventListener('click', () => renderProfile());
             document.getElementById('whatsappGroupBtn')?.addEventListener('click', () => {
                 if (whatsappGroupLink && whatsappGroupLink !== "https://chat.whatsapp.com/yourgroupinvite") {
                     window.open(whatsappGroupLink, '_blank');
@@ -1715,6 +1939,7 @@
             attachBottomNav();
             renderFloatingWhatsApp();
             resetInactivityTimer();
+            setupMenuListeners();
         }
         
         function renderTable() {
@@ -1737,7 +1962,7 @@
                                            </tr>
                                     `).join('')}
                                 </tbody>
-                            </table>
+                              </table>
                         </div>
                         <div class="action-grid mt-2">
                             <button class="btn btn-secondary" id="closeTable">Close</button>
@@ -1752,6 +1977,7 @@
             document.getElementById('startInvest')?.addEventListener('click', () => renderDeposit());
             attachBottomNav();
             renderFloatingWhatsApp();
+            setupMenuListeners();
         }
         
         function renderTransactions() {
@@ -1823,6 +2049,7 @@
             document.getElementById('backBtn')?.addEventListener('click', () => renderDashboard());
             attachBottomNav();
             renderFloatingWhatsApp();
+            setupMenuListeners();
         }
         
         async function getReferralInvestments(referralUserId) {
@@ -1869,11 +2096,11 @@
                         </div>
                         <div class="table-wrapper">
                             <table class="investment-table">
-                                <thead> <tr><th>Level</th><th>Commission</th><th>Earned</th> </tr> </thead>
+                                <thead>  Was<th>Level</th><th>Commission</th><th>Earned</th> </thead>
                                 <tbody>
-                                    <tr><td>Level 1</td><td>10%</td><td>${formatMoney(userData?.referralEarnings?.level1 || 0)}</td></tr>
-                                    <tr><td>Level 2</td><td>4%</td><td>${formatMoney(userData?.referralEarnings?.level2 || 0)}</td></tr>
-                                    <tr><td>Level 3</td><td>1%</td><td>${formatMoney(userData?.referralEarnings?.level3 || 0)}</td></tr>
+                                      <tr><td>Level 1</td><td>10%</td><td>${formatMoney(userData?.referralEarnings?.level1 || 0)}</td></tr>
+                                      <tr><td>Level 2</td><td>4%</td><td>${formatMoney(userData?.referralEarnings?.level2 || 0)}</td></tr>
+                                      <tr><td>Level 3</td><td>1%</td><td>${formatMoney(userData?.referralEarnings?.level3 || 0)}</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -1901,6 +2128,7 @@
             document.getElementById('copyLink')?.addEventListener('click', () => copyToClipboard(`https://swwiptrade.site/?ref=${userData?.username}`));
             attachBottomNav();
             renderFloatingWhatsApp();
+            setupMenuListeners();
         }
         
         function renderProfile() {
@@ -1912,24 +2140,14 @@
                         <div class="stat-box" style="margin-bottom: 12px;"><div class="label">Phone</div><div class="value">${userData?.phone || 'Not set'}</div></div>
                         <div class="stat-box" style="margin-bottom: 12px;"><div class="label">Country</div><div class="value">${userData?.country || 'Uganda'}</div></div>
                         <div class="stat-box" style="margin-bottom: 12px;"><div class="label">Referred By</div><div class="value">${userData?.referredBy || 'None'}</div></div>
-                        <button class="btn btn-danger" id="logoutBtn">Logout</button>
                     </div>
                 </div>
                 ${renderBottomNav('me')}
             `;
             document.getElementById('backBtn')?.addEventListener('click', () => renderDashboard());
-            document.getElementById('logoutBtn')?.addEventListener('click', async () => { 
-                if (unsubscribeSnapshot) unsubscribeSnapshot();
-                if (refreshTimer) clearInterval(refreshTimer);
-                if (inactivityTimer) clearTimeout(inactivityTimer);
-                stopTradingUpdates();
-                await signOut(auth); 
-                currentUser = null; 
-                userData = null; 
-                showLoginPage(); 
-            });
             attachBottomNav();
             renderFloatingWhatsApp();
+            setupMenuListeners();
         }
         
         function renderDeposit() {
@@ -1970,6 +2188,7 @@
             });
             attachBottomNav();
             renderFloatingWhatsApp();
+            setupMenuListeners();
         }
         
         function renderReinvest() {
@@ -1993,6 +2212,7 @@
             });
             attachBottomNav();
             renderFloatingWhatsApp();
+            setupMenuListeners();
         }
         
         function renderWithdraw() {
@@ -2063,6 +2283,7 @@
             }
             attachBottomNav();
             renderFloatingWhatsApp();
+            setupMenuListeners();
         }
         
         function renderBottomNav(active) {
