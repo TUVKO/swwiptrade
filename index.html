@@ -793,6 +793,9 @@
             profit: 12.50
         };
         
+        // ADDED: Flag to prevent duplicate profit processing
+        let isProcessingProfit = false;
+        
         function formatMoney(amount) {
             return (amount || 0).toLocaleString() + ' UGX';
         }
@@ -1086,14 +1089,28 @@
             return totalEarnings;
         }
         
+        // FIXED: Added duplicate prevention
         async function calculateDailyEarnings() {
             if (!userData || !currentUser) return;
+            if (isProcessingProfit) {
+                console.log('⚠️ Profit already processing, skipping duplicate...');
+                return;
+            }
+            
+            isProcessingProfit = true;
             console.log('\n🔄 Checking for daily earnings...');
-            await processUserEarnings(currentUser.uid, userData);
+            
+            try {
+                await processUserEarnings(currentUser.uid, userData);
+            } finally {
+                isProcessingProfit = false;
+            }
         }
         
+        // FIXED: Added duplicate prevention
         async function checkMissedDaysOnLogin() {
             if (!currentUser || !userData) return;
+            if (isProcessingProfit) return;
             
             const today = new Date().toDateString();
             const lastLoginDate = localStorage.getItem('lastLoginDate');
@@ -1713,11 +1730,11 @@
                                 </thead>
                                 <tbody>
                                     ${INVESTMENT_PLANS.map(p => `
-                                          <tr>
+                                           <tr>
                                             <td style="font-weight: bold;">${formatMoney(p.amount)}</td>
                                             <td style="color: #FFB347;">${formatMoney(p.daily)}</td>
                                             <td style="color: #10B981;">${formatMoney(p.total)}</td>
-                                          </tr>
+                                           </tr>
                                     `).join('')}
                                 </tbody>
                             </table>
@@ -1856,8 +1873,9 @@
                                 <tbody>
                                     <tr><td>Level 1</td><td>10%</td><td>${formatMoney(userData?.referralEarnings?.level1 || 0)}</td></tr>
                                     <tr><td>Level 2</td><td>4%</td><td>${formatMoney(userData?.referralEarnings?.level2 || 0)}</td></tr>
-                                    <tr><td>Level 3</td><td>1%</td><td>${formatMoney(userData?.referralEarnings?.level3 || 0)}  </tbody>
-                               </table>
+                                    <tr><td>Level 3</td><td>1%</td><td>${formatMoney(userData?.referralEarnings?.level3 || 0)}</td></tr>
+                                </tbody>
+                            </table>
                         </div>
                         ${referralsList.length > 0 ? `
                             <div class="referral-list">
