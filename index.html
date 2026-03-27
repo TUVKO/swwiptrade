@@ -171,6 +171,54 @@
         }
         /* ========== END HAMBURGER MENU STYLES ========== */
 
+        /* ========== NEW BUTTONS STYLES ========== */
+        .action-buttons-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin: 12px 0;
+        }
+        
+        .action-btn {
+            padding: 14px 8px;
+            border: none;
+            border-radius: 40px;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: center;
+            color: white;
+        }
+        
+        .action-btn-add {
+            background: #10B981;
+        }
+        
+        .action-btn-add:active {
+            background: #059669;
+            transform: scale(0.98);
+        }
+        
+        .action-btn-cashout {
+            background: #F59E0B;
+        }
+        
+        .action-btn-cashout:active {
+            background: #D97706;
+            transform: scale(0.98);
+        }
+        
+        .action-btn-reinvest {
+            background: #3B82F6;
+        }
+        
+        .action-btn-reinvest:active {
+            background: #2563EB;
+            transform: scale(0.98);
+        }
+        /* ========== END NEW BUTTONS STYLES ========== */
+
         .floating-wa {
             position: fixed;
             bottom: 80px;
@@ -1965,6 +2013,14 @@
                         <div class="referral-link">https://swwiptrade.site/?ref=${userData?.username}</div>
                         <button class="copy-btn" id="copyLink">Copy</button>
                     </div>
+                    
+                    <!-- NEW: Add cash, Cashout, re-invest buttons -->
+                    <div class="action-buttons-row">
+                        <button class="action-btn action-btn-add" id="addCashBtn">Add cash</button>
+                        <button class="action-btn action-btn-cashout" id="cashoutBtn">Cashout</button>
+                        <button class="action-btn action-btn-reinvest" id="reinvestBtn">re-invest</button>
+                    </div>
+                    
                     <div class="card">
                         <button class="btn btn-secondary whatsapp-btn" id="whatsappGroupBtn">💬 Join WhatsApp Group</button>
                     </div>
@@ -1972,6 +2028,9 @@
                 ${renderBottomNav('home')}
             `;
             document.getElementById('copyLink')?.addEventListener('click', () => copyToClipboard(`https://swwiptrade.site/?ref=${userData?.username}`));
+            document.getElementById('addCashBtn')?.addEventListener('click', () => renderDeposit());
+            document.getElementById('cashoutBtn')?.addEventListener('click', () => renderWithdraw());
+            document.getElementById('reinvestBtn')?.addEventListener('click', () => renderReinvest());
             document.getElementById('whatsappGroupBtn')?.addEventListener('click', () => {
                 if (whatsappGroupLink && whatsappGroupLink !== "https://chat.whatsapp.com/yourgroupinvite") {
                     window.open(whatsappGroupLink, '_blank');
@@ -2002,10 +2061,10 @@
                                             <td style="font-weight: bold;">${formatMoney(p.amount)}</td>
                                             <td style="color: #FFB347;">${formatMoney(p.daily)}</td>
                                             <td style="color: #10B981;">${formatMoney(p.total)}</td>
-                                          </tr>
+                                           </tr>
                                     `).join('')}
                                 </tbody>
-                            </table>
+                              </table>
                         </div>
                         <div class="action-grid mt-2">
                             <button class="btn btn-secondary" id="closeTable">Close</button>
@@ -2139,13 +2198,13 @@
                         </div>
                         <div class="table-wrapper">
                             <table class="investment-table">
-                                <thead> <tr><th>Level</th><th>Commission</th><th>Earned</th> </tr> </thead>
+                                <thead>  <th>Level</th><th>Commission</th><th>Earned</th> </thead>
                                 <tbody>
-                                     <tr><td>Level 1</td><td>10%</td><td>${formatMoney(userData?.referralEarnings?.level1 || 0)}</td></tr>
-                                     <tr><td>Level 2</td><td>4%</td><td>${formatMoney(userData?.referralEarnings?.level2 || 0)}</td></tr>
-                                     <tr><td>Level 3</td><td>1%</td><td>${formatMoney(userData?.referralEarnings?.level3 || 0)}</td></tr>
+                                      <tr><td>Level 1</td><td>10%</td><td>${formatMoney(userData?.referralEarnings?.level1 || 0)}</td></tr>
+                                      <tr><td>Level 2</td><td>4%</td><td>${formatMoney(userData?.referralEarnings?.level2 || 0)}</td></tr>
+                                      <tr><td>Level 3</td><td>1%</td><td>${formatMoney(userData?.referralEarnings?.level3 || 0)}</td></tr>
                                 </tbody>
-                            </table>
+                              </table>
                         </div>
                         ${referralsList.length > 0 ? `
                             <div class="referral-list">
