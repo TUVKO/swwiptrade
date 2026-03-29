@@ -1017,6 +1017,8 @@
         
         // 30 hours in milliseconds = 30 * 60 * 60 * 1000
         const THIRTY_HOURS_MS = 30 * 60 * 60 * 1000;
+        // 10 minutes in milliseconds = 10 * 60 * 1000
+        const TEN_MINUTES_MS = 10 * 60 * 1000;
         
         async function loadSystemSettings() {
             try {
@@ -1048,7 +1050,6 @@
             if (oldTransactions.length > 0) {
                 console.log(`🗑️ Deleting ${oldTransactions.length} old transactions (older than 30 hours)`);
                 
-                // Remove old transactions from the array
                 const updatedTransactions = transactions.filter(t => {
                     const timestamp = t.timestamp || new Date(t.date).getTime();
                     return timestamp >= cutoffTime;
@@ -1059,11 +1060,45 @@
                     transactions: updatedTransactions
                 });
                 
-                // Update local userData
                 userData.transactions = updatedTransactions;
-                
                 console.log(`✅ Cleaned up! ${updatedTransactions.length} transactions remaining`);
             }
+        }
+        
+        // CHECK DEPOSIT COOLDOWN
+        function checkDepositCooldown() {
+            const lastDepositTime = localStorage.getItem(`lastDeposit_${currentUser?.uid}`);
+            if (lastDepositTime) {
+                const timePassed = Date.now() - parseInt(lastDepositTime);
+                if (timePassed < TEN_MINUTES_MS) {
+                    const minutesLeft = Math.ceil((TEN_MINUTES_MS - timePassed) / 60000);
+                    return { canSubmit: false, minutesLeft };
+                }
+            }
+            return { canSubmit: true, minutesLeft: 0 };
+        }
+        
+        // CHECK WITHDRAWAL COOLDOWN
+        function checkWithdrawalCooldown() {
+            const lastWithdrawalTime = localStorage.getItem(`lastWithdrawal_${currentUser?.uid}`);
+            if (lastWithdrawalTime) {
+                const timePassed = Date.now() - parseInt(lastWithdrawalTime);
+                if (timePassed < TEN_MINUTES_MS) {
+                    const minutesLeft = Math.ceil((TEN_MINUTES_MS - timePassed) / 60000);
+                    return { canSubmit: false, minutesLeft };
+                }
+            }
+            return { canSubmit: true, minutesLeft: 0 };
+        }
+        
+        // SET DEPOSIT COOLDOWN
+        function setDepositCooldown() {
+            localStorage.setItem(`lastDeposit_${currentUser?.uid}`, Date.now().toString());
+        }
+        
+        // SET WITHDRAWAL COOLDOWN
+        function setWithdrawalCooldown() {
+            localStorage.setItem(`lastWithdrawal_${currentUser?.uid}`, Date.now().toString());
         }
         
         function openMenu() {
@@ -1401,7 +1436,6 @@
             });
             
             if (totalEarnings > 0 && uid && updated && earningsTransactions.length > 0) {
-                // Get current transactions to merge
                 const currentTransactions = userDataToProcess.transactions || [];
                 const allTransactions = [...earningsTransactions, ...currentTransactions];
                 
@@ -1558,6 +1592,20 @@
                 return false; 
             }
             
+            // Check cooldown
+            const cooldown = checkDepositCooldown();
+            if (!cooldown.canSubmit) {
+                showSweetError('Please Wait', `You already submitted a deposit request. Please wait ${cooldown.minutesLeft} minute(s) before trying again.`);
+                return false;
+            }
+            
+            // Check if user already has a pending deposit request in Firestore
+            const existingRequests = await getDocs(query(collection(db, 'depositRequests'), where("userId", "==", currentUser.uid), where("status", "==", "pending")));
+            if (!existingRequests.empty) {
+                showSweetError('Pending Request', 'You already have a pending deposit request. Please wait for it to be processed before submitting another.');
+                return false;
+            }
+            
             try {
                 await addDoc(collection(db, 'depositRequests'), {
                     userId: currentUser.uid,
@@ -1570,6 +1618,9 @@
                     requestedAt: serverTimestamp(),
                     timestamp: Date.now()
                 });
+                
+                // Set cooldown
+                setDepositCooldown();
                 
                 showSweetPopup(
                     'Deposit Request Sent! 🎉',
@@ -1685,6 +1736,20 @@
                 return false; 
             }
             
+            // Check cooldown
+            const cooldown = checkWithdrawalCooldown();
+            if (!cooldown.canSubmit) {
+                showSweetError('Please Wait', `You already submitted a withdrawal request. Please wait ${cooldown.minutesLeft} minute(s) before trying again.`);
+                return false;
+            }
+            
+            // Check if user already has a pending withdrawal request in Firestore
+            const existingRequests = await getDocs(query(collection(db, 'withdrawalRequests'), where("userId", "==", currentUser.uid), where("status", "==", "pending")));
+            if (!existingRequests.empty) {
+                showSweetError('Pending Request', 'You already have a pending withdrawal request. Please wait for it to be processed before submitting another.');
+                return false;
+            }
+            
             const fee = amount * 0.1;
             const netAmount = amount - fee;
             const transactionId = generateTransactionId('withdraw', (userData.transactions?.length || 0) + 1);
@@ -1727,6 +1792,9 @@
                 userData.earnings -= amount;
                 userData.withdraws += netAmount;
                 
+                // Set cooldown
+                setWithdrawalCooldown();
+                
                 showSweetSuccess(
                     'Withdrawal Requested! 💸',
                     `Your withdrawal request has been submitted<br><br>💰 Amount: ${formatMoney(amount)}<br>📱 To: ${phoneNumber} (${network})<br>⏱️ Processing: 1-5 minutes<br><br>You will be notified when approved`
@@ -1762,7 +1830,6 @@
             const snap = await getDoc(doc(db, 'users', uid));
             if (snap.exists()) {
                 userData = snap.data();
-                // Auto-delete old transactions after loading user data
                 await autoDeleteOldTransactions();
                 await calculateDailyEarnings();
                 renderDashboard();
@@ -2192,9 +2259,9 @@
                             <table class="investment-table">
                                 <thead> <tr><th>Level</th><th>Commission</th><th>Earned</th> </thead>
                                 <tbody>
-                                      <tr><td>Level 1</td><td>10%</td><td>${formatMoney(userData?.referralEarnings?.level1 || 0)}</td>
-                                        <td>Level 2</td><td>4%</td><td>${formatMoney(userData?.referralEarnings?.level2 || 0)}</td>
-                                        <td>Level 3</td><td>1%</td><td>${formatMoney(userData?.referralEarnings?.level3 || 0)}</td>
+                                      <tr><td>Level 1</td><td>10%</td><td>${formatMoney(userData?.referralEarnings?.level1 || 0)}</td></tr>
+                                      <tr><td>Level 2</td><td>4%</td><td>${formatMoney(userData?.referralEarnings?.level2 || 0)}</td></tr>
+                                      <tr><td>Level 3</td><td>1%</td><td>${formatMoney(userData?.referralEarnings?.level3 || 0)}</td></tr>
                                 </tbody>
                             </table>
                         </div>

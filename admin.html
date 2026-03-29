@@ -666,7 +666,7 @@
             }
         }
         
-        // ========== REAL-TIME DEPOSIT LISTENER (INSTANT DISPLAY) ==========
+        // ========== REAL-TIME DEPOSIT LISTENER (INSTANT DISPLAY - NEWEST FIRST - NO DUPLICATES) ==========
         function setupDepositListener() {
             if (depositListener) return;
             
@@ -675,27 +675,41 @@
                     if (change.type === 'added') {
                         const deposit = change.doc.data();
                         if (deposit.status === 'pending') {
-                            const newDeposit = {
-                                ...deposit,
-                                requestId: change.doc.id,
-                                timestamp: deposit.timestamp || Date.now()
-                            };
-                            pendingDeposits.unshift(newDeposit);
-                            updateTabTitle(pendingDeposits.length, pendingWithdrawalRequests.length);
-                            renderAdminPanel();
-                            playNotificationSound();
-                            showBrowserNotification(
-                                '💰 New Deposit Request!',
-                                `${deposit.username} requested ${formatMoney(deposit.amount)} via ${deposit.network || 'MTN'}`,
-                                'https://swwiptrade.site/logo.png'
-                            );
-                            showAlert(`🔔 NEW DEPOSIT: ${deposit.username} - ${formatMoney(deposit.amount)}`, 'success');
+                            // CHECK FOR DUPLICATE BEFORE ADDING
+                            const exists = pendingDeposits.some(d => d.requestId === change.doc.id);
+                            if (!exists) {
+                                const newDeposit = {
+                                    ...deposit,
+                                    requestId: change.doc.id,
+                                    timestamp: deposit.timestamp || Date.now()
+                                };
+                                pendingDeposits.unshift(newDeposit);
+                                updateTabTitle(pendingDeposits.length, pendingWithdrawalRequests.length);
+                                renderAdminPanel();
+                                playNotificationSound();
+                                showBrowserNotification(
+                                    '💰 New Deposit Request!',
+                                    `${deposit.username} requested ${formatMoney(deposit.amount)} via ${deposit.network || 'MTN'}`,
+                                    'https://swwiptrade.site/logo.png'
+                                );
+                                showAlert(`🔔 NEW DEPOSIT: ${deposit.username} - ${formatMoney(deposit.amount)}`, 'success');
+                            } else {
+                                console.log('Duplicate deposit request ignored:', change.doc.id);
+                            }
                         }
                     } else if (change.type === 'removed') {
                         const removedId = change.doc.id;
                         pendingDeposits = pendingDeposits.filter(d => d.requestId !== removedId);
                         updateTabTitle(pendingDeposits.length, pendingWithdrawalRequests.length);
                         renderAdminPanel();
+                    } else if (change.type === 'modified') {
+                        // Handle status changes - remove if no longer pending
+                        const deposit = change.doc.data();
+                        if (deposit.status !== 'pending') {
+                            pendingDeposits = pendingDeposits.filter(d => d.requestId !== change.doc.id);
+                            updateTabTitle(pendingDeposits.length, pendingWithdrawalRequests.length);
+                            renderAdminPanel();
+                        }
                     }
                 });
             }, (error) => {
@@ -703,7 +717,7 @@
             });
         }
         
-        // ========== REAL-TIME WITHDRAWAL LISTENER (INSTANT DISPLAY) ==========
+        // ========== REAL-TIME WITHDRAWAL LISTENER (INSTANT DISPLAY - NEWEST FIRST - NO DUPLICATES) ==========
         function setupWithdrawalListener() {
             if (withdrawalListener) return;
             
@@ -712,27 +726,41 @@
                     if (change.type === 'added') {
                         const withdrawal = change.doc.data();
                         if (withdrawal.status === 'pending') {
-                            const newWithdrawal = {
-                                ...withdrawal,
-                                requestId: change.doc.id,
-                                timestamp: withdrawal.timestamp || Date.now()
-                            };
-                            pendingWithdrawalRequests.unshift(newWithdrawal);
-                            updateTabTitle(pendingDeposits.length, pendingWithdrawalRequests.length);
-                            renderAdminPanel();
-                            playNotificationSound();
-                            showBrowserNotification(
-                                '💸 New Withdrawal Request!',
-                                `${withdrawal.username} requested ${formatMoney(withdrawal.amount)} to ${withdrawal.withdrawalPhone || withdrawal.userPhone}`,
-                                'https://swwiptrade.site/logo.png'
-                            );
-                            showAlert(`🔔 NEW WITHDRAWAL: ${withdrawal.username} - ${formatMoney(withdrawal.amount)}`, 'warning');
+                            // CHECK FOR DUPLICATE BEFORE ADDING
+                            const exists = pendingWithdrawalRequests.some(w => w.requestId === change.doc.id);
+                            if (!exists) {
+                                const newWithdrawal = {
+                                    ...withdrawal,
+                                    requestId: change.doc.id,
+                                    timestamp: withdrawal.timestamp || Date.now()
+                                };
+                                pendingWithdrawalRequests.unshift(newWithdrawal);
+                                updateTabTitle(pendingDeposits.length, pendingWithdrawalRequests.length);
+                                renderAdminPanel();
+                                playNotificationSound();
+                                showBrowserNotification(
+                                    '💸 New Withdrawal Request!',
+                                    `${withdrawal.username} requested ${formatMoney(withdrawal.amount)} to ${withdrawal.withdrawalPhone || withdrawal.userPhone}`,
+                                    'https://swwiptrade.site/logo.png'
+                                );
+                                showAlert(`🔔 NEW WITHDRAWAL: ${withdrawal.username} - ${formatMoney(withdrawal.amount)}`, 'warning');
+                            } else {
+                                console.log('Duplicate withdrawal request ignored:', change.doc.id);
+                            }
                         }
                     } else if (change.type === 'removed') {
                         const removedId = change.doc.id;
                         pendingWithdrawalRequests = pendingWithdrawalRequests.filter(w => w.requestId !== removedId);
                         updateTabTitle(pendingDeposits.length, pendingWithdrawalRequests.length);
                         renderAdminPanel();
+                    } else if (change.type === 'modified') {
+                        // Handle status changes - remove if no longer pending
+                        const withdrawal = change.doc.data();
+                        if (withdrawal.status !== 'pending') {
+                            pendingWithdrawalRequests = pendingWithdrawalRequests.filter(w => w.requestId !== change.doc.id);
+                            updateTabTitle(pendingDeposits.length, pendingWithdrawalRequests.length);
+                            renderAdminPanel();
+                        }
                     }
                 });
             }, (error) => {
@@ -847,7 +875,8 @@
                     });
                 }
             });
-            pendingDeposits.sort((a, b) => a.timestamp - b.timestamp);
+            // Sort newest first (highest timestamp first)
+            pendingDeposits.sort((a, b) => b.timestamp - a.timestamp);
             return pendingDeposits;
         }
         
@@ -864,7 +893,8 @@
                     });
                 }
             });
-            pendingWithdrawalRequests.sort((a, b) => a.timestamp - b.timestamp);
+            // Sort newest first (highest timestamp first)
+            pendingWithdrawalRequests.sort((a, b) => b.timestamp - a.timestamp);
             return pendingWithdrawalRequests;
         }
         
