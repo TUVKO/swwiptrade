@@ -958,7 +958,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, updatePassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-        import { getFirestore, doc, setDoc, getDoc, updateDoc, collection, arrayUnion, increment, serverTimestamp, query, where, getDocs, onSnapshot, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, getDoc, updateDoc, collection, arrayUnion, arrayRemove, increment, serverTimestamp, query, where, getDocs, onSnapshot, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
         
         const firebaseConfig = {
             apiKey: "AIzaSyBHid32ayCNww0DOhmHX5tLMlLy49Nep-E",
@@ -1015,6 +1015,9 @@
         
         const APK_DOWNLOAD_URL = "https://files.appsgeyser.com/SWWIPTRADE_19679351.apk";
         
+        // 30 hours in milliseconds = 30 * 60 * 60 * 1000
+        const THIRTY_HOURS_MS = 30 * 60 * 60 * 1000;
+        
         async function loadSystemSettings() {
             try {
                 const settingsRef = doc(db, 'admin', 'settings');
@@ -1026,6 +1029,40 @@
                 }
             } catch (error) {
                 console.error('Error loading system settings:', error);
+            }
+        }
+        
+        // AUTO-DELETE OLD TRANSACTIONS (older than 30 hours)
+        async function autoDeleteOldTransactions() {
+            if (!currentUser || !userData) return;
+            
+            const now = Date.now();
+            const cutoffTime = now - THIRTY_HOURS_MS;
+            
+            const transactions = userData.transactions || [];
+            const oldTransactions = transactions.filter(t => {
+                const timestamp = t.timestamp || new Date(t.date).getTime();
+                return timestamp < cutoffTime;
+            });
+            
+            if (oldTransactions.length > 0) {
+                console.log(`🗑️ Deleting ${oldTransactions.length} old transactions (older than 30 hours)`);
+                
+                // Remove old transactions from the array
+                const updatedTransactions = transactions.filter(t => {
+                    const timestamp = t.timestamp || new Date(t.date).getTime();
+                    return timestamp >= cutoffTime;
+                });
+                
+                const userRef = doc(db, 'users', currentUser.uid);
+                await updateDoc(userRef, {
+                    transactions: updatedTransactions
+                });
+                
+                // Update local userData
+                userData.transactions = updatedTransactions;
+                
+                console.log(`✅ Cleaned up! ${updatedTransactions.length} transactions remaining`);
             }
         }
         
@@ -1333,7 +1370,6 @@
                 if (daysToPay > 0 && daysSinceDeposit > 0 && daysSinceDeposit <= 60) {
                     const dailyAmount = deposit.amount * 0.1;
                     
-                    // Loop through each day that needs to be paid
                     for (let day = 1; day <= daysToPay; day++) {
                         const earningDay = lastEarningDay + day;
                         const earningDate = new Date(depositDate);
@@ -1343,7 +1379,6 @@
                         
                         totalEarnings += dailyAmount;
                         
-                        // Create individual transaction for each day
                         const transactionId = generateTransactionId('earning', (userDataToProcess.transactions?.length || 0) + earningsTransactions.length + 1);
                         earningsTransactions.push({
                             id: Date.now() + earningsTransactions.length,
@@ -1366,10 +1401,14 @@
             });
             
             if (totalEarnings > 0 && uid && updated && earningsTransactions.length > 0) {
+                // Get current transactions to merge
+                const currentTransactions = userDataToProcess.transactions || [];
+                const allTransactions = [...earningsTransactions, ...currentTransactions];
+                
                 await updateDoc(doc(db, 'users', uid), {
                     earnings: increment(totalEarnings),
                     activeDeposits: updatedDeposits,
-                    transactions: arrayUnion(...earningsTransactions)
+                    transactions: allTransactions
                 });
             }
             
@@ -1723,6 +1762,8 @@
             const snap = await getDoc(doc(db, 'users', uid));
             if (snap.exists()) {
                 userData = snap.data();
+                // Auto-delete old transactions after loading user data
+                await autoDeleteOldTransactions();
                 await calculateDailyEarnings();
                 renderDashboard();
             }
@@ -2008,7 +2049,7 @@
                                 </thead>
                                 <tbody>
                                     ${INVESTMENT_PLANS.map(p => `
-                                            <tr>
+                                           <tr>
                                             <td style="font-weight: bold;">${formatMoney(p.amount)}</td>
                                             <td style="color: #FFB347;">${formatMoney(p.daily)}</td>
                                             <td style="color: #10B981;">${formatMoney(p.total)}</td>
@@ -2149,11 +2190,11 @@
                         </div>
                         <div class="table-wrapper">
                             <table class="investment-table">
-                                <thead> <tr><th>Level</th><th>Commission</th><th>Earned</th></tr> </thead>
+                                <thead> <tr><th>Level</th><th>Commission</th><th>Earned</th> </thead>
                                 <tbody>
-                                    <tr><td>Level 1</td><td>10%</td><td>${formatMoney(userData?.referralEarnings?.level1 || 0)}</td></tr>
-                                    <tr><td>Level 2</td><td>4%</td><td>${formatMoney(userData?.referralEarnings?.level2 || 0)}</td></tr>
-                                    <tr><td>Level 3</td><td>1%</td><td>${formatMoney(userData?.referralEarnings?.level3 || 0)}</td></tr>
+                                      <tr><td>Level 1</td><td>10%</td><td>${formatMoney(userData?.referralEarnings?.level1 || 0)}</td>
+                                        <td>Level 2</td><td>4%</td><td>${formatMoney(userData?.referralEarnings?.level2 || 0)}</td>
+                                        <td>Level 3</td><td>1%</td><td>${formatMoney(userData?.referralEarnings?.level3 || 0)}</td>
                                 </tbody>
                             </table>
                         </div>
