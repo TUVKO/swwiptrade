@@ -603,7 +603,6 @@
         let depositListener = null;
         let withdrawalListener = null;
         
-        // APK Download Link
         const APK_DOWNLOAD_URL = "https://files.appsgeyser.com/SWWIPTRADE_19679351.apk";
         
         function formatMoney(amount) {
@@ -849,84 +848,162 @@
             return `${typeCode}-${year}${month}${day}-${seq}`;
         }
         
-        // FIXED: Properly find referrer by username using query
-        async function processReferralCommissionForDeposit(userId, depositAmount) {
-            if (depositAmount <= 0) return;
-            console.log('Processing referral commission for deposit:', depositAmount, 'from user:', userId);
+        // ========== COMPLETELY REWRITTEN REFERRAL SYSTEM ==========
+        // Case-insensitive, whitespace-trimmed, with detailed logging
+        
+        async function findUserByUsername(username) {
+            if (!username || username.trim() === '') return null;
+            
+            const trimmedUsername = username.trim();
+            console.log(`🔍 Searching for user: "${trimmedUsername}"`);
+            
+            // First try exact match
+            const exactQuery = query(collection(db, 'users'), where("username", "==", trimmedUsername));
+            const exactSnapshot = await getDocs(exactQuery);
+            
+            if (!exactSnapshot.empty) {
+                const doc = exactSnapshot.docs[0];
+                console.log(`✅ Found exact match: ${doc.data().username}`);
+                return { id: doc.id, data: doc.data() };
+            }
+            
+            // If exact match fails, try case-insensitive search
+            console.log(`⚠️ No exact match for "${trimmedUsername}", trying case-insensitive...`);
+            const allUsersSnapshot = await getDocs(collection(db, 'users'));
+            
+            for (const doc of allUsersSnapshot.docs) {
+                const userData = doc.data();
+                const storedUsername = userData.username;
+                if (storedUsername && storedUsername.toLowerCase() === trimmedUsername.toLowerCase()) {
+                    console.log(`✅ Found case-insensitive match: "${storedUsername}" = "${trimmedUsername}"`);
+                    return { id: doc.id, data: userData };
+                }
+            }
+            
+            console.log(`❌ No user found with username matching "${trimmedUsername}"`);
+            return null;
+        }
+        
+        async function processReferralCommission(depositorId, depositAmount) {
+            console.log('========================================');
+            console.log('💰 REFERRAL COMMISSION PROCESS STARTED');
+            console.log(`Deposit Amount: ${formatMoney(depositAmount)}`);
+            console.log(`Depositor ID: ${depositorId}`);
+            console.log('========================================');
+            
+            if (depositAmount <= 0) {
+                console.log('❌ Deposit amount is 0, skipping');
+                return;
+            }
             
             try {
-                let currentUserId = userId;
+                // Get depositor data
+                const depositorRef = doc(db, 'users', depositorId);
+                const depositorSnap = await getDoc(depositorRef);
+                
+                if (!depositorSnap.exists()) {
+                    console.log('❌ Depositor not found');
+                    return;
+                }
+                
+                const depositor = depositorSnap.data();
+                console.log(`👤 Depositor: ${depositor.username}`);
+                
+                let referrerUsername = depositor.referredBy;
+                
+                if (!referrerUsername || referrerUsername.trim() === '') {
+                    console.log('ℹ️ No referrer for this user. Skipping commission.');
+                    return;
+                }
+                
+                // Trim whitespace from stored referrer username
+                referrerUsername = referrerUsername.trim();
+                console.log(`🔗 Referrer username from depositor: "${referrerUsername}"`);
+                
+                let currentReferrerId = null;
+                let currentReferrerData = null;
                 let level = 1;
-                let commissionRate = 0.10;
+                let commissionRates = { 1: 0.10, 2: 0.04, 3: 0.01 };
+                let commissionsAdded = 0;
                 let visited = new Set();
                 
-                while (level <= 3 && currentUserId && !visited.has(currentUserId)) {
-                    visited.add(currentUserId);
+                while (level <= 3 && referrerUsername && !visited.has(referrerUsername)) {
+                    visited.add(referrerUsername);
+                    console.log(`\n--- LEVEL ${level} (${commissionRates[level]*100}%) ---`);
                     
-                    // Get the current user's data
-                    const currentUserRef = doc(db, 'users', currentUserId);
-                    const currentUserSnap = await getDoc(currentUserRef);
-                    if (!currentUserSnap.exists()) {
-                        console.log('User not found:', currentUserId);
+                    // Find the referrer by username
+                    const referrerResult = await findUserByUsername(referrerUsername);
+                    
+                    if (!referrerResult) {
+                        console.log(`❌ Referrer "${referrerUsername}" not found. Breaking chain.`);
                         break;
                     }
                     
-                    const currentUserData = currentUserSnap.data();
-                    const referrerUsername = currentUserData.referredBy;
+                    currentReferrerId = referrerResult.id;
+                    currentReferrerData = referrerResult.data;
                     
-                    if (!referrerUsername) {
-                        console.log('No referrer for user:', currentUserData.username);
+                    console.log(`✅ Found referrer: ${currentReferrerData.username} (ID: ${currentReferrerId})`);
+                    
+                    // Calculate commission
+                    const commissionAmount = depositAmount * commissionRates[level];
+                    console.log(`💰 Commission to add: ${formatMoney(commissionAmount)}`);
+                    
+                    if (commissionAmount <= 0) {
+                        console.log(`⚠️ Commission amount is 0, skipping`);
                         break;
                     }
                     
-                    console.log(`Level ${level}: ${currentUserData.username} was referred by ${referrerUsername}`);
+                    // Generate transaction ID
+                    const transactionCount = (currentReferrerData.transactions || []).length;
+                    const transactionId = generateTransactionId('referral', transactionCount + 1);
                     
-                    // Query to find the referrer by username
-                    const usersRef = collection(db, 'users');
-                    const q = query(usersRef, where("username", "==", referrerUsername));
-                    const referrerSnapshot = await getDocs(q);
-                    
-                    if (referrerSnapshot.empty()) {
-                        console.log('Referrer not found:', referrerUsername);
-                        break;
-                    }
-                    
-                    const referrerDoc = referrerSnapshot.docs[0];
-                    const referrerId = referrerDoc.id;
-                    const referrerData = referrerDoc.data();
-                    
-                    const commission = depositAmount * commissionRate;
-                    console.log(`Adding ${commission} UGX (${commissionRate*100}%) to ${referrerUsername}`);
-                    
-                    const transactionId = generateTransactionId('referral', (referrerData.transactions?.length || 0) + 1);
-                    
-                    await updateDoc(doc(db, 'users', referrerId), {
-                        earnings: increment(commission),
-                        [`referralEarnings.level${level}`]: increment(commission),
+                    // Update referrer's data
+                    await updateDoc(doc(db, 'users', currentReferrerId), {
+                        earnings: increment(commissionAmount),
+                        [`referralEarnings.level${level}`]: increment(commissionAmount),
                         transactions: arrayUnion({
                             id: Date.now(),
                             transactionId: transactionId,
                             type: 'referral',
-                            amount: commission,
-                            description: `Level ${level} Referral Commission (${commissionRate*100}%) from deposit of ${formatMoney(depositAmount)}`,
+                            amount: commissionAmount,
+                            description: `Level ${level} Referral Commission (${commissionRates[level]*100}%) from ${depositor.username}'s deposit of ${formatMoney(depositAmount)}`,
                             date: new Date().toISOString(),
                             timestamp: Date.now(),
                             status: 'completed'
                         })
                     });
                     
-                    console.log(`✅ Commission added to ${referrerUsername}`);
+                    console.log(`✅ SUCCESS: Added ${formatMoney(commissionAmount)} to ${currentReferrerData.username}`);
+                    commissionsAdded++;
                     
-                    // Move up to the next level
-                    currentUserId = referrerId;
+                    // Show browser notification if admin is the referrer
+                    if (currentUser && currentUser.uid === currentReferrerId) {
+                        showBrowserNotification(
+                            '💰 Referral Commission!',
+                            `You earned ${formatMoney(commissionAmount)} from Level ${level} referral!`,
+                            'https://swwiptrade.site/logo.png'
+                        );
+                    }
+                    
+                    // Move to next level
+                    referrerUsername = currentReferrerData.referredBy ? currentReferrerData.referredBy.trim() : null;
                     level++;
-                    if (level === 2) commissionRate = 0.04;
-                    if (level === 3) commissionRate = 0.01;
                 }
                 
-                console.log('Referral commission processing complete');
+                console.log('\n========================================');
+                console.log(`📊 REFERRAL PROCESSING COMPLETE`);
+                console.log(`Total commissions added: ${commissionsAdded}`);
+                console.log('========================================');
+                
+                if (commissionsAdded > 0) {
+                    showAlert(`🎉 Referral commissions added! ${commissionsAdded} upline(s) received bonuses.`, 'success');
+                } else {
+                    console.log('⚠️ No commissions were added');
+                }
+                
             } catch (error) {
-                console.error('Referral commission error:', error);
+                console.error('❌ Referral commission error:', error);
+                showAlert('Referral processing failed: ' + error.message, 'error');
             }
         }
         
@@ -989,9 +1066,9 @@
                 systemSettings.adminEarnings += adminCommission;
                 await saveSystemSettings();
                 
-                // Process referral commission for the deposit
-                console.log('Processing referral commission for deposit:', amount);
-                await processReferralCommissionForDeposit(userId, amount);
+                // Process referral commissions
+                console.log('🔄 Starting referral commission processing...');
+                await processReferralCommission(userId, amount);
                 
                 await deleteDoc(doc(db, 'depositRequests', requestId));
                 
@@ -1304,9 +1381,9 @@
                         <input type="text" id="searchDeposits" class="search-box" placeholder="🔍 Search by username, registered phone, deposit phone, or amount..." value="${depositSearchTerm}">
                         ${filteredDeposits.length === 0 ? '<div class="alert alert-success">No pending deposit requests</div>' : `
                             <div class="table-wrapper">
-                                <table>
+                                 <table>
                                     <thead>
-                                        <tr><th>User</th><th>Amount</th><th>User's Phone</th><th>Deposit Phone</th><th>Network</th><th>Admin Fee (${systemSettings.adminCommissionRate}%)</th><th>Total to Request</th><th>Date</th><th>Actions</th></tr>
+                                         <tr><th>User</th><th>Amount</th><th>User's Phone</th><th>Deposit Phone</th><th>Network</th><th>Admin Fee (${systemSettings.adminCommissionRate}%)</th><th>Total to Request</th><th>Date</th><th>Actions</th></tr>
                                     </thead>
                                     <tbody>
                                         ${filteredDeposits.map(d => {

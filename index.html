@@ -1467,82 +1467,17 @@
             localStorage.setItem('lastLoginDate', today);
         }
         
-        // FIXED: Properly find referrer by username using query
+        // ========== REFERRAL SYSTEM FOR USER (when they get commission from admin approval) ==========
+        // This function is for the user side - called when admin approves deposit
+        // The actual commission is added by admin.html, this just refreshes the UI
+        // But we keep it for any future direct referral needs
+        
         async function processReferralCommission(userId, depositAmount, level = 1, visited = new Set()) {
-            if (depositAmount <= 0 || visited.has(userId)) return;
-            visited.add(userId);
-            
-            console.log(`Processing referral commission - Level ${level}, User ID: ${userId}, Amount: ${depositAmount}`);
-            
-            try {
-                const userRef = doc(db, 'users', userId);
-                const userSnap = await getDoc(userRef);
-                if (!userSnap.exists()) {
-                    console.log(`User ${userId} not found`);
-                    return;
-                }
-                const user = userSnap.data();
-                const referrerUsername = user.referredBy;
-                
-                if (!referrerUsername) {
-                    console.log(`No referrer for user ${user.username}`);
-                    return;
-                }
-                
-                console.log(`${user.username} was referred by ${referrerUsername}`);
-                
-                let commissionRate = level === 1 ? 0.10 : level === 2 ? 0.04 : level === 3 ? 0.01 : 0;
-                if (commissionRate === 0) {
-                    console.log(`Max level reached (3)`);
-                    return;
-                }
-                
-                const commission = depositAmount * commissionRate;
-                console.log(`Level ${level} commission: ${commission} UGX (${commissionRate*100}%)`);
-                
-                // Query to find the referrer by username
-                const usersRef = collection(db, 'users');
-                const q = query(usersRef, where("username", "==", referrerUsername));
-                const referrerSnapshot = await getDocs(q);
-                
-                if (referrerSnapshot.empty()) {
-                    console.log(`Referrer ${referrerUsername} not found in database`);
-                    return;
-                }
-                
-                const referrerDoc = referrerSnapshot.docs[0];
-                const referrerId = referrerDoc.id;
-                const referrerData = referrerDoc.data();
-                
-                const transactionId = generateTransactionId('referral', (referrerData.transactions?.length || 0) + 1);
-                
-                await updateDoc(doc(db, 'users', referrerId), {
-                    earnings: increment(commission),
-                    [`referralEarnings.level${level}`]: increment(commission),
-                    transactions: arrayUnion({
-                        id: Date.now(),
-                        transactionId: transactionId,
-                        type: 'referral',
-                        amount: commission,
-                        description: `Level ${level} Referral Commission (${commissionRate*100}%) from deposit of ${formatMoney(depositAmount)}`,
-                        date: new Date().toISOString(),
-                        timestamp: Date.now(),
-                        status: 'completed'
-                    })
-                });
-                
-                console.log(`✅ Added ${formatMoney(commission)} to ${referrerUsername}`);
-                
-                if (currentUser && currentUser.uid === referrerId) {
-                    showBonusNotification(`+${formatMoney(commission)} from Level ${level} referral!`);
-                }
-                
-                // Move up to next level
-                await processReferralCommission(referrerId, depositAmount, level + 1, visited);
-                
-            } catch (error) {
-                console.error('Referral commission error:', error);
-            }
+            // This function is kept for completeness but commissions are handled by admin.html
+            // When a user's earnings update via realtime listener, they'll see the new balance
+            console.log(`Referral commission triggered for user ${userId} - amount ${depositAmount}`);
+            // Refresh user data to show updated earnings
+            await refreshUserData();
         }
         
         async function refreshUserData() {
@@ -1575,14 +1510,21 @@
             if (!referrerUsername) return;
             
             try {
+                // Find referrer by username (case-insensitive)
                 const usersRef = collection(db, 'users');
-                const q = query(usersRef, where("username", "==", referrerUsername));
-                const querySnapshot = await getDocs(q);
+                const allUsersSnapshot = await getDocs(usersRef);
+                let referrerDoc = null;
                 
-                if (!querySnapshot.empty) {
-                    const referrerDoc = querySnapshot.docs[0];
+                for (const doc of allUsersSnapshot.docs) {
+                    const userData = doc.data();
+                    if (userData.username && userData.username.toLowerCase() === referrerUsername.toLowerCase()) {
+                        referrerDoc = doc;
+                        break;
+                    }
+                }
+                
+                if (referrerDoc) {
                     const referrerRef = doc(db, 'users', referrerDoc.id);
-                    
                     await updateDoc(referrerRef, {
                         referrals: arrayUnion({
                             username: newUsername,
@@ -1590,7 +1532,9 @@
                             joinedAt: new Date().toISOString()
                         })
                     });
-                    console.log(`Added ${newUsername} to ${referrerUsername}'s referrals list`);
+                    console.log(`✅ Added ${newUsername} to ${referrerDoc.data().username}'s referrals list`);
+                } else {
+                    console.log(`❌ Referrer ${referrerUsername} not found`);
                 }
             } catch (error) {
                 console.error('Error updating referrer list:', error);
@@ -1975,7 +1919,7 @@
                     const newUserData = {
                         username, email, phone, country,
                         password: password,
-                        referredBy: referralCode || null,
+                        referredBy: referralCode ? referralCode.trim() : null,
                         balance: 0, deposits: 0, earnings: 4000, withdraws: 0,
                         activeDeposits: [],
                         transactions: [{ 
@@ -2132,7 +2076,7 @@
                                           </tr>
                                     `).join('')}
                                 </tbody>
-                              </table>
+                            </table>
                         </div>
                         <div class="action-grid mt-2">
                             <button class="btn btn-secondary" id="closeTable">Close</button>
@@ -2272,7 +2216,7 @@
                                     <tr><td>Level 2</td><td>4%</td><td>${formatMoney(userData?.referralEarnings?.level2 || 0)}</td></tr>
                                     <tr><td>Level 3</td><td>1%</td><td>${formatMoney(userData?.referralEarnings?.level3 || 0)}</td></tr>
                                 </tbody>
-                              </table>
+                            </table>
                         </div>
                         ${referralsList.length > 0 ? `
                             <div class="referral-list">
