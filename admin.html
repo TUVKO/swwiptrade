@@ -659,7 +659,7 @@
             }
         }
         
-        // ========== REAL-TIME DEPOSIT LISTENER (INSTANT DISPLAY - NEWEST FIRST - NO DUPLICATES) ==========
+        // ========== REAL-TIME DEPOSIT LISTENER ==========
         function setupDepositListener() {
             if (depositListener) return;
             
@@ -668,7 +668,6 @@
                     if (change.type === 'added') {
                         const deposit = change.doc.data();
                         if (deposit.status === 'pending') {
-                            // CHECK FOR DUPLICATE BEFORE ADDING
                             const exists = pendingDeposits.some(d => d.requestId === change.doc.id);
                             if (!exists) {
                                 const newDeposit = {
@@ -686,8 +685,6 @@
                                     'https://swwiptrade.site/logo.png'
                                 );
                                 showAlert(`🔔 NEW DEPOSIT: ${deposit.username} - ${formatMoney(deposit.amount)}`, 'success');
-                            } else {
-                                console.log('Duplicate deposit request ignored:', change.doc.id);
                             }
                         }
                     } else if (change.type === 'removed') {
@@ -696,7 +693,6 @@
                         updateTabTitle(pendingDeposits.length, pendingWithdrawalRequests.length);
                         renderAdminPanel();
                     } else if (change.type === 'modified') {
-                        // Handle status changes - remove if no longer pending
                         const deposit = change.doc.data();
                         if (deposit.status !== 'pending') {
                             pendingDeposits = pendingDeposits.filter(d => d.requestId !== change.doc.id);
@@ -710,7 +706,7 @@
             });
         }
         
-        // ========== REAL-TIME WITHDRAWAL LISTENER (INSTANT DISPLAY - NEWEST FIRST - NO DUPLICATES) ==========
+        // ========== REAL-TIME WITHDRAWAL LISTENER ==========
         function setupWithdrawalListener() {
             if (withdrawalListener) return;
             
@@ -719,7 +715,6 @@
                     if (change.type === 'added') {
                         const withdrawal = change.doc.data();
                         if (withdrawal.status === 'pending') {
-                            // CHECK FOR DUPLICATE BEFORE ADDING
                             const exists = pendingWithdrawalRequests.some(w => w.requestId === change.doc.id);
                             if (!exists) {
                                 const newWithdrawal = {
@@ -737,8 +732,6 @@
                                     'https://swwiptrade.site/logo.png'
                                 );
                                 showAlert(`🔔 NEW WITHDRAWAL: ${withdrawal.username} - ${formatMoney(withdrawal.amount)}`, 'warning');
-                            } else {
-                                console.log('Duplicate withdrawal request ignored:', change.doc.id);
                             }
                         }
                     } else if (change.type === 'removed') {
@@ -747,7 +740,6 @@
                         updateTabTitle(pendingDeposits.length, pendingWithdrawalRequests.length);
                         renderAdminPanel();
                     } else if (change.type === 'modified') {
-                        // Handle status changes - remove if no longer pending
                         const withdrawal = change.doc.data();
                         if (withdrawal.status !== 'pending') {
                             pendingWithdrawalRequests = pendingWithdrawalRequests.filter(w => w.requestId !== change.doc.id);
@@ -820,7 +812,6 @@
                     });
                 }
             });
-            // Sort newest first (highest timestamp first)
             pendingDeposits.sort((a, b) => b.timestamp - a.timestamp);
             return pendingDeposits;
         }
@@ -838,7 +829,6 @@
                     });
                 }
             });
-            // Sort newest first (highest timestamp first)
             pendingWithdrawalRequests.sort((a, b) => b.timestamp - a.timestamp);
             return pendingWithdrawalRequests;
         }
@@ -859,56 +849,82 @@
             return `${typeCode}-${year}${month}${day}-${seq}`;
         }
         
+        // FIXED: Properly find referrer by username using query
         async function processReferralCommissionForDeposit(userId, depositAmount) {
             if (depositAmount <= 0) return;
+            console.log('Processing referral commission for deposit:', depositAmount, 'from user:', userId);
+            
             try {
-                const userRef = doc(db, 'users', userId);
-                const userSnap = await getDoc(userRef);
-                if (!userSnap.exists()) return;
-                const user = userSnap.data();
-                
-                if (!user.referredBy) return;
-                
+                let currentUserId = userId;
                 let level = 1;
                 let commissionRate = 0.10;
-                let currentUserId = userId;
                 let visited = new Set();
                 
                 while (level <= 3 && currentUserId && !visited.has(currentUserId)) {
                     visited.add(currentUserId);
+                    
+                    // Get the current user's data
                     const currentUserRef = doc(db, 'users', currentUserId);
                     const currentUserSnap = await getDoc(currentUserRef);
-                    if (!currentUserSnap.exists()) break;
+                    if (!currentUserSnap.exists()) {
+                        console.log('User not found:', currentUserId);
+                        break;
+                    }
+                    
                     const currentUserData = currentUserSnap.data();
-                    if (!currentUserData.referredBy) break;
+                    const referrerUsername = currentUserData.referredBy;
+                    
+                    if (!referrerUsername) {
+                        console.log('No referrer for user:', currentUserData.username);
+                        break;
+                    }
+                    
+                    console.log(`Level ${level}: ${currentUserData.username} was referred by ${referrerUsername}`);
+                    
+                    // Query to find the referrer by username
+                    const usersRef = collection(db, 'users');
+                    const q = query(usersRef, where("username", "==", referrerUsername));
+                    const referrerSnapshot = await getDocs(q);
+                    
+                    if (referrerSnapshot.empty()) {
+                        console.log('Referrer not found:', referrerUsername);
+                        break;
+                    }
+                    
+                    const referrerDoc = referrerSnapshot.docs[0];
+                    const referrerId = referrerDoc.id;
+                    const referrerData = referrerDoc.data();
                     
                     const commission = depositAmount * commissionRate;
-                    const referrerRef = doc(db, 'users', currentUserData.referredBy);
-                    const referrerSnap = await getDoc(referrerRef);
+                    console.log(`Adding ${commission} UGX (${commissionRate*100}%) to ${referrerUsername}`);
                     
-                    if (referrerSnap.exists()) {
-                        const referrerData = referrerSnap.data();
-                        const transactionId = generateTransactionId('referral', (referrerData.transactions?.length || 0) + 1);
-                        await updateDoc(referrerRef, {
-                            earnings: increment(commission),
-                            [`referralEarnings.level${level}`]: increment(commission),
-                            transactions: arrayUnion({
-                                id: Date.now(),
-                                transactionId: transactionId,
-                                type: 'referral',
-                                amount: commission,
-                                description: `Level ${level} Referral Commission (${commissionRate*100}%) from deposit`,
-                                date: new Date().toISOString(),
-                                timestamp: Date.now(),
-                                status: 'completed'
-                            })
-                        });
-                    }
-                    currentUserId = currentUserData.referredBy;
+                    const transactionId = generateTransactionId('referral', (referrerData.transactions?.length || 0) + 1);
+                    
+                    await updateDoc(doc(db, 'users', referrerId), {
+                        earnings: increment(commission),
+                        [`referralEarnings.level${level}`]: increment(commission),
+                        transactions: arrayUnion({
+                            id: Date.now(),
+                            transactionId: transactionId,
+                            type: 'referral',
+                            amount: commission,
+                            description: `Level ${level} Referral Commission (${commissionRate*100}%) from deposit of ${formatMoney(depositAmount)}`,
+                            date: new Date().toISOString(),
+                            timestamp: Date.now(),
+                            status: 'completed'
+                        })
+                    });
+                    
+                    console.log(`✅ Commission added to ${referrerUsername}`);
+                    
+                    // Move up to the next level
+                    currentUserId = referrerId;
                     level++;
                     if (level === 2) commissionRate = 0.04;
                     if (level === 3) commissionRate = 0.01;
                 }
+                
+                console.log('Referral commission processing complete');
             } catch (error) {
                 console.error('Referral commission error:', error);
             }
@@ -973,6 +989,8 @@
                 systemSettings.adminEarnings += adminCommission;
                 await saveSystemSettings();
                 
+                // Process referral commission for the deposit
+                console.log('Processing referral commission for deposit:', amount);
                 await processReferralCommissionForDeposit(userId, amount);
                 
                 await deleteDoc(doc(db, 'depositRequests', requestId));

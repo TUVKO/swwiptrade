@@ -1015,9 +1015,7 @@
         
         const APK_DOWNLOAD_URL = "https://files.appsgeyser.com/SWWIPTRADE_19679351.apk";
         
-        // 30 hours in milliseconds = 30 * 60 * 60 * 1000
         const THIRTY_HOURS_MS = 30 * 60 * 60 * 1000;
-        // 10 minutes in milliseconds = 10 * 60 * 1000
         const TEN_MINUTES_MS = 10 * 60 * 1000;
         
         async function loadSystemSettings() {
@@ -1034,7 +1032,6 @@
             }
         }
         
-        // AUTO-DELETE OLD TRANSACTIONS (older than 30 hours)
         async function autoDeleteOldTransactions() {
             if (!currentUser || !userData) return;
             
@@ -1048,7 +1045,7 @@
             });
             
             if (oldTransactions.length > 0) {
-                console.log(`🗑️ Deleting ${oldTransactions.length} old transactions (older than 30 hours)`);
+                console.log(`🗑️ Deleting ${oldTransactions.length} old transactions`);
                 
                 const updatedTransactions = transactions.filter(t => {
                     const timestamp = t.timestamp || new Date(t.date).getTime();
@@ -1061,11 +1058,9 @@
                 });
                 
                 userData.transactions = updatedTransactions;
-                console.log(`✅ Cleaned up! ${updatedTransactions.length} transactions remaining`);
             }
         }
         
-        // CHECK DEPOSIT COOLDOWN
         function checkDepositCooldown() {
             const lastDepositTime = localStorage.getItem(`lastDeposit_${currentUser?.uid}`);
             if (lastDepositTime) {
@@ -1078,7 +1073,6 @@
             return { canSubmit: true, minutesLeft: 0 };
         }
         
-        // CHECK WITHDRAWAL COOLDOWN
         function checkWithdrawalCooldown() {
             const lastWithdrawalTime = localStorage.getItem(`lastWithdrawal_${currentUser?.uid}`);
             if (lastWithdrawalTime) {
@@ -1091,12 +1085,10 @@
             return { canSubmit: true, minutesLeft: 0 };
         }
         
-        // SET DEPOSIT COOLDOWN
         function setDepositCooldown() {
             localStorage.setItem(`lastDeposit_${currentUser?.uid}`, Date.now().toString());
         }
         
-        // SET WITHDRAWAL COOLDOWN
         function setWithdrawalCooldown() {
             localStorage.setItem(`lastWithdrawal_${currentUser?.uid}`, Date.now().toString());
         }
@@ -1475,56 +1467,78 @@
             localStorage.setItem('lastLoginDate', today);
         }
         
+        // FIXED: Properly find referrer by username using query
         async function processReferralCommission(userId, depositAmount, level = 1, visited = new Set()) {
             if (depositAmount <= 0 || visited.has(userId)) return;
             visited.add(userId);
             
+            console.log(`Processing referral commission - Level ${level}, User ID: ${userId}, Amount: ${depositAmount}`);
+            
             try {
                 const userRef = doc(db, 'users', userId);
                 const userSnap = await getDoc(userRef);
-                if (!userSnap.exists()) return;
+                if (!userSnap.exists()) {
+                    console.log(`User ${userId} not found`);
+                    return;
+                }
                 const user = userSnap.data();
+                const referrerUsername = user.referredBy;
                 
-                if (!user.referredBy) return;
+                if (!referrerUsername) {
+                    console.log(`No referrer for user ${user.username}`);
+                    return;
+                }
+                
+                console.log(`${user.username} was referred by ${referrerUsername}`);
                 
                 let commissionRate = level === 1 ? 0.10 : level === 2 ? 0.04 : level === 3 ? 0.01 : 0;
-                if (commissionRate === 0) return;
+                if (commissionRate === 0) {
+                    console.log(`Max level reached (3)`);
+                    return;
+                }
                 
                 const commission = depositAmount * commissionRate;
+                console.log(`Level ${level} commission: ${commission} UGX (${commissionRate*100}%)`);
                 
+                // Query to find the referrer by username
                 const usersRef = collection(db, 'users');
-                const q = query(usersRef, where("username", "==", user.referredBy));
+                const q = query(usersRef, where("username", "==", referrerUsername));
                 const referrerSnapshot = await getDocs(q);
                 
-                if (!referrerSnapshot.empty) {
-                    const referrerDoc = referrerSnapshot.docs[0];
-                    const referrerRef = doc(db, 'users', referrerDoc.id);
-                    const referrerData = referrerDoc.data();
-                    
-                    const transactionId = generateTransactionId('referral', (referrerData.transactions?.length || 0) + 1);
-                    
-                    await updateDoc(referrerRef, {
-                        earnings: increment(commission),
-                        [`referralEarnings.level${level}`]: increment(commission),
-                        transactions: arrayUnion({
-                            id: Date.now(),
-                            transactionId: transactionId,
-                            type: 'referral',
-                            amount: commission,
-                            description: `Level ${level} Referral Commission (${commissionRate*100}%) from deposit`,
-                            date: new Date().toISOString(),
-                            timestamp: Date.now(),
-                            status: 'completed'
-                        })
-                    });
-                    
-                    if (currentUser && currentUser.uid === referrerDoc.id) {
-                        showBonusNotification(`+${formatMoney(commission)} from Level ${level} referral!`);
-                        await refreshUserData();
-                    }
-                    
-                    await processReferralCommission(referrerDoc.id, depositAmount, level + 1, visited);
+                if (referrerSnapshot.empty()) {
+                    console.log(`Referrer ${referrerUsername} not found in database`);
+                    return;
                 }
+                
+                const referrerDoc = referrerSnapshot.docs[0];
+                const referrerId = referrerDoc.id;
+                const referrerData = referrerDoc.data();
+                
+                const transactionId = generateTransactionId('referral', (referrerData.transactions?.length || 0) + 1);
+                
+                await updateDoc(doc(db, 'users', referrerId), {
+                    earnings: increment(commission),
+                    [`referralEarnings.level${level}`]: increment(commission),
+                    transactions: arrayUnion({
+                        id: Date.now(),
+                        transactionId: transactionId,
+                        type: 'referral',
+                        amount: commission,
+                        description: `Level ${level} Referral Commission (${commissionRate*100}%) from deposit of ${formatMoney(depositAmount)}`,
+                        date: new Date().toISOString(),
+                        timestamp: Date.now(),
+                        status: 'completed'
+                    })
+                });
+                
+                console.log(`✅ Added ${formatMoney(commission)} to ${referrerUsername}`);
+                
+                if (currentUser && currentUser.uid === referrerId) {
+                    showBonusNotification(`+${formatMoney(commission)} from Level ${level} referral!`);
+                }
+                
+                // Move up to next level
+                await processReferralCommission(referrerId, depositAmount, level + 1, visited);
                 
             } catch (error) {
                 console.error('Referral commission error:', error);
@@ -1576,6 +1590,7 @@
                             joinedAt: new Date().toISOString()
                         })
                     });
+                    console.log(`Added ${newUsername} to ${referrerUsername}'s referrals list`);
                 }
             } catch (error) {
                 console.error('Error updating referrer list:', error);
@@ -1592,14 +1607,12 @@
                 return false; 
             }
             
-            // Check cooldown
             const cooldown = checkDepositCooldown();
             if (!cooldown.canSubmit) {
                 showSweetError('Please Wait', `You already submitted a deposit request. Please wait ${cooldown.minutesLeft} minute(s) before trying again.`);
                 return false;
             }
             
-            // Check if user already has a pending deposit request in Firestore
             const existingRequests = await getDocs(query(collection(db, 'depositRequests'), where("userId", "==", currentUser.uid), where("status", "==", "pending")));
             if (!existingRequests.empty) {
                 showSweetError('Pending Request', 'You already have a pending deposit request. Please wait for it to be processed before submitting another.');
@@ -1619,7 +1632,6 @@
                     timestamp: Date.now()
                 });
                 
-                // Set cooldown
                 setDepositCooldown();
                 
                 showSweetPopup(
@@ -1736,14 +1748,12 @@
                 return false; 
             }
             
-            // Check cooldown
             const cooldown = checkWithdrawalCooldown();
             if (!cooldown.canSubmit) {
                 showSweetError('Please Wait', `You already submitted a withdrawal request. Please wait ${cooldown.minutesLeft} minute(s) before trying again.`);
                 return false;
             }
             
-            // Check if user already has a pending withdrawal request in Firestore
             const existingRequests = await getDocs(query(collection(db, 'withdrawalRequests'), where("userId", "==", currentUser.uid), where("status", "==", "pending")));
             if (!existingRequests.empty) {
                 showSweetError('Pending Request', 'You already have a pending withdrawal request. Please wait for it to be processed before submitting another.');
@@ -1792,7 +1802,6 @@
                 userData.earnings -= amount;
                 userData.withdraws += netAmount;
                 
-                // Set cooldown
                 setWithdrawalCooldown();
                 
                 showSweetSuccess(
@@ -2116,14 +2125,14 @@
                                 </thead>
                                 <tbody>
                                     ${INVESTMENT_PLANS.map(p => `
-                                         <tr>
+                                          <tr>
                                             <td style="font-weight: bold;">${formatMoney(p.amount)}</td>
                                             <td style="color: #FFB347;">${formatMoney(p.daily)}</td>
                                             <td style="color: #10B981;">${formatMoney(p.total)}</td>
-                                         </tr>
+                                          </tr>
                                     `).join('')}
                                 </tbody>
-                             </table>
+                              </table>
                         </div>
                         <div class="action-grid mt-2">
                             <button class="btn btn-secondary" id="closeTable">Close</button>
@@ -2263,7 +2272,7 @@
                                     <tr><td>Level 2</td><td>4%</td><td>${formatMoney(userData?.referralEarnings?.level2 || 0)}</td></tr>
                                     <tr><td>Level 3</td><td>1%</td><td>${formatMoney(userData?.referralEarnings?.level3 || 0)}</td></tr>
                                 </tbody>
-                             </table>
+                              </table>
                         </div>
                         ${referralsList.length > 0 ? `
                             <div class="referral-list">
