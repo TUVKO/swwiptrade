@@ -287,11 +287,6 @@
             color: #F59E0B;
         }
 
-        .status-independent {
-            background: #8B5CF620;
-            color: #8B5CF6;
-        }
-
         .modal {
             display: none;
             position: fixed;
@@ -584,7 +579,6 @@
         
         const ADMIN_USERNAME = "admin";
         const ADMIN_PASSWORD = "SWWIPTRADE2024";
-        const INDEPENDENT_THRESHOLD = 250000;
         
         let currentUser = null;
         let allUsers = [];
@@ -601,7 +595,6 @@
             whatsappGroupLink: "",
             adminCommissionRate: 3.5,
             adminEarnings: 0,
-            independentThreshold: INDEPENDENT_THRESHOLD,
             hideWithdrawLock: true,
             appDownloadDisabled: false
         };
@@ -768,54 +761,6 @@
             });
         }
         
-        async function checkAndRemoveReferral(userId, depositAmount) {
-            if (depositAmount < INDEPENDENT_THRESHOLD) return false;
-            
-            const userRef = doc(db, 'users', userId);
-            const userSnap = await getDoc(userRef);
-            if (!userSnap.exists()) return false;
-            
-            const user = userSnap.data();
-            if (!user.referredBy || user.isIndependent) return false;
-            
-            const referrerUsername = user.referredBy;
-            
-            await updateDoc(userRef, {
-                referredBy: null,
-                isIndependent: true,
-                independentAt: serverTimestamp(),
-                independentAmount: depositAmount
-            });
-            
-            const usersRef = collection(db, 'users');
-            const q = query(usersRef, where("username", "==", referrerUsername));
-            const referrerSnapshot = await getDocs(q);
-            
-            if (!referrerSnapshot.empty) {
-                const referrerDoc = referrerSnapshot.docs[0];
-                const referrerRef = doc(db, 'users', referrerDoc.id);
-                const referrerData = referrerDoc.data();
-                
-                const updatedReferrals = (referrerData.referrals || []).filter(r => r.username !== user.username);
-                await updateDoc(referrerRef, { referrals: updatedReferrals });
-            }
-            
-            await updateDoc(userRef, {
-                transactions: arrayUnion({
-                    id: Date.now(),
-                    type: 'info',
-                    amount: depositAmount,
-                    description: `🎉 INDEPENDENT USER: Deposited ${formatMoney(depositAmount)} which meets the threshold (${formatMoney(INDEPENDENT_THRESHOLD)}). Referral link removed.`,
-                    date: new Date().toISOString(),
-                    timestamp: Date.now(),
-                    status: 'completed'
-                })
-            });
-            
-            showAlert(`⚠️ User ${user.username} became INDEPENDENT! Referral link removed.`, 'warning');
-            return true;
-        }
-        
         async function loadSystemSettings() {
             const settingsRef = doc(db, 'admin', 'settings');
             const settingsSnap = await getDoc(settingsRef);
@@ -915,7 +860,6 @@
         }
         
         async function processReferralCommissionForDeposit(userId, depositAmount) {
-            if (depositAmount >= INDEPENDENT_THRESHOLD) return;
             if (depositAmount <= 0) return;
             try {
                 const userRef = doc(db, 'users', userId);
@@ -923,7 +867,6 @@
                 if (!userSnap.exists()) return;
                 const user = userSnap.data();
                 
-                if (user.isIndependent) return;
                 if (!user.referredBy) return;
                 
                 let level = 1;
@@ -991,8 +934,6 @@
                 const depositTxId = generateTransactionId('deposit', (user.transactions?.length || 0) + 1);
                 const profitTxId = generateTransactionId('earning', (user.transactions?.length || 0) + 2);
                 
-                const becameIndependent = await checkAndRemoveReferral(userId, amount);
-                
                 await updateDoc(userRef, {
                     deposits: increment(amount),
                     earnings: increment(firstDayProfit),
@@ -1011,7 +952,7 @@
                             transactionId: depositTxId,
                             type: 'deposit',
                             amount: amount,
-                            description: `Deposit of ${amount} UGX via ${network} Mobile Money (Approved by admin)${becameIndependent ? ' - INDEPENDENT USER' : ''}`,
+                            description: `Deposit of ${amount} UGX via ${network} Mobile Money (Approved by admin)`,
                             date: new Date().toISOString(),
                             timestamp: depositTimestamp,
                             status: 'completed'
@@ -1032,9 +973,7 @@
                 systemSettings.adminEarnings += adminCommission;
                 await saveSystemSettings();
                 
-                if (!becameIndependent) {
-                    await processReferralCommissionForDeposit(userId, amount);
-                }
+                await processReferralCommissionForDeposit(userId, amount);
                 
                 await deleteDoc(doc(db, 'depositRequests', requestId));
                 
@@ -1042,11 +981,7 @@
                 updateTabTitle(pendingDeposits.length, pendingWithdrawalRequests.length);
                 renderAdminPanel();
                 
-                if (becameIndependent) {
-                    showAlert(`✅ Deposit approved! ${formatMoney(amount)} added. ⚠️ User became INDEPENDENT!`, 'warning');
-                } else {
-                    showAlert(`✅ Deposit approved! Admin earned ${formatMoney(adminCommission)} (${systemSettings.adminCommissionRate}%)`, 'success');
-                }
+                showAlert(`✅ Deposit approved! Admin earned ${formatMoney(adminCommission)} (${systemSettings.adminCommissionRate}%)`, 'success');
                 return true;
             } catch (error) {
                 console.error('Error approving deposit:', error);
@@ -1174,7 +1109,6 @@
             if (updates.earnings !== undefined) updateData.earnings = updates.earnings;
             if (updates.withdrawLocked !== undefined) updateData.withdrawLocked = updates.withdrawLocked;
             if (updates.referredBy !== undefined) updateData.referredBy = updates.referredBy;
-            if (updates.isIndependent !== undefined) updateData.isIndependent = updates.isIndependent;
             
             await updateDoc(userRef, updateData);
             
@@ -1304,7 +1238,6 @@
             const totalEarnings = allUsers.reduce((sum, u) => sum + (u.earnings || 0), 0);
             const totalWithdraws = allUsers.reduce((sum, u) => sum + (u.withdraws || 0), 0);
             const lockedUsers = allUsers.filter(u => u.withdrawLocked === true).length;
-            const independentUsers = allUsers.filter(u => u.isIndependent === true).length;
             const whatsappChatLink = systemSettings.whatsappChatLink || "";
             const whatsappGroupLink = systemSettings.whatsappGroupLink || "";
             
@@ -1326,7 +1259,7 @@
                     </div>
                     
                     <div class="stats-grid">
-                        <div class="stat-card"><div class="label">👥 Total Users</div><div class="value">${allUsers.length}</div><div class="sub">${lockedUsers} locked | ${independentUsers} independent</div></div>
+                        <div class="stat-card"><div class="label">👥 Total Users</div><div class="value">${allUsers.length}</div><div class="sub">${lockedUsers} locked</div></div>
                         <div class="stat-card"><div class="label">💰 Total Deposits</div><div class="value">${formatMoney(totalDeposits)}</div><div class="sub">All users combined</div></div>
                         <div class="stat-card"><div class="label">📈 Total Earnings</div><div class="value">${formatMoney(totalEarnings)}</div><div class="sub">Profits paid</div></div>
                         <div class="stat-card"><div class="label">💸 Total Withdrawals</div><div class="value">${formatMoney(totalWithdraws)}</div><div class="sub">${pendingWithdrawalRequests.length} pending</div></div>
@@ -1347,9 +1280,6 @@
                             <div class="stat-card"><div class="label">📅 Daily Profit</div><div class="value">${systemSettings.dailyProfit}%</div><div class="sub">Per active deposit</div></div>
                             <div class="stat-card"><div class="label">💰 Fees</div><div class="value">${systemSettings.withdrawFee}%</div><div class="sub">Withdrawal fee</div></div>
                         </div>
-                        <div class="threshold-info">
-                            <strong>⚡ Independent User Rule:</strong> Users who deposit <strong>${formatMoney(INDEPENDENT_THRESHOLD)} or more</strong> become <strong style="color: #8B5CF6;">INDEPENDENT</strong>. Their referral link is removed and NO referral commissions are paid.
-                        </div>
                     </div>
                     
                     <div id="depositsTab" style="display: ${currentTab === 'deposits' ? 'block' : 'none'}">
@@ -1358,16 +1288,15 @@
                             <div class="table-wrapper">
                                 <table>
                                     <thead>
-                                         <tr><th>User</th><th>Amount</th><th>User's Phone</th><th>Deposit Phone</th><th>Network</th><th>Admin Fee (${systemSettings.adminCommissionRate}%)</th><th>Total to Request</th><th>Date</th><th>Actions</th></tr>
+                                        <tr><th>User</th><th>Amount</th><th>User's Phone</th><th>Deposit Phone</th><th>Network</th><th>Admin Fee (${systemSettings.adminCommissionRate}%)</th><th>Total to Request</th><th>Date</th><th>Actions</th></tr>
                                     </thead>
                                     <tbody>
                                         ${filteredDeposits.map(d => {
                                             const adminFee = d.amount * (systemSettings.adminCommissionRate / 100);
                                             const totalToRequest = d.amount + adminFee;
-                                            const willBeIndependent = d.amount >= INDEPENDENT_THRESHOLD;
                                             return `
                                                 <tr>
-                                                    <td><strong>${d.username}</strong>${willBeIndependent ? ' <span class="status-badge status-independent">⚡ INDEPENDENT</span>' : ''}</td>
+                                                    <td><strong>${d.username}</strong></td>
                                                     <td>${formatMoney(d.amount)}</td>
                                                     <td>${d.userPhone || 'N/A'}</td>
                                                     <td>${d.depositPhone || 'N/A'}</td>
@@ -1393,7 +1322,7 @@
                             <div class="table-wrapper">
                                 <table>
                                     <thead>
-                                         <tr><th>User</th><th>Requested</th><th>Fee (10%)</th><th>Net to Pay</th><th>User's Phone</th><th>Withdrawal Phone</th><th>Network</th><th>Date</th><th>Transaction ID</th><th>Actions</th></tr>
+                                        <tr><th>User</th><th>Requested</th><th>Fee (10%)</th><th>Net to Pay</th><th>User's Phone</th><th>Withdrawal Phone</th><th>Network</th><th>Date</th><th>Transaction ID</th><th>Actions</th></tr>
                                     </thead>
                                     <tbody>
                                         ${filteredWithdrawals.map(w => {
@@ -1427,12 +1356,12 @@
                         <div class="table-wrapper">
                             <table>
                                 <thead>
-                                     <tr><th>Username</th><th>Phone</th><th>Deposits</th><th>Earnings</th><th>Withdraws</th><th>Referrals</th><th>Status</th><th>Actions</th></tr>
+                                    <tr><th>Username</th><th>Phone</th><th>Deposits</th><th>Earnings</th><th>Withdraws</th><th>Referrals</th><th>Status</th><th>Actions</th></tr>
                                 </thead>
                                 <tbody id="usersTableBody">
                                     ${allUsers.map(user => `
                                         <tr>
-                                            <td><strong>${user.username}</strong>${user.isIndependent ? ' <span class="status-badge status-independent">⚡ INDEPENDENT</span>' : ''}</td>
+                                            <td><strong>${user.username}</strong></td>
                                             <td>${user.phone || 'N/A'}</td>
                                             <td>${formatMoney(user.deposits || 0)}</td>
                                             <td>${formatMoney(user.earnings || 0)}</td>
@@ -1482,14 +1411,6 @@
                             <div class="small-text" style="margin-top: 4px;">You earn this percentage on every approved deposit</div>
                             <div class="small-text" style="margin-top: 8px; color: #FFB347;">💰 Current Admin Earnings: ${formatMoney(systemSettings.adminEarnings)}</div>
                             <button class="btn btn-primary" id="saveCommissionBtn" style="margin-top: 12px;">Save Commission Rate</button>
-                        </div>
-                        
-                        <div class="settings-group">
-                            <h3>⚡ Independent User Rule</h3>
-                            <div class="threshold-info" style="margin-bottom: 0;">
-                                <strong>Threshold Amount:</strong> ${formatMoney(INDEPENDENT_THRESHOLD)}<br>
-                                <strong>Effect:</strong> Users who deposit this amount or more become INDEPENDENT. Their referral link is removed and NO referral commissions are paid.
-                            </div>
                         </div>
                         
                         <div class="settings-group">
@@ -1703,7 +1624,7 @@
                     if (tbody) {
                         tbody.innerHTML = filtered.map(user => `
                             <tr>
-                                <td><strong>${user.username}</strong>${user.isIndependent ? ' <span class="status-badge status-independent">⚡ INDEPENDENT</span>' : ''}</td>
+                                <td><strong>${user.username}</strong></td>
                                 <td>${user.phone || 'N/A'}</td>
                                 <td>${formatMoney(user.deposits || 0)}</td>
                                 <td>${formatMoney(user.earnings || 0)}</td>
@@ -1775,7 +1696,7 @@
                     <p><strong>Phone:</strong> ${user.phone || 'Not set'}</p>
                     <p><strong>Country:</strong> ${user.country || 'Uganda'}</p>
                     <p><strong>Password:</strong> ${user.password || 'Not stored'}</p>
-                    <p><strong>Referred By:</strong> ${user.referredBy || 'None'} ${user.isIndependent ? '<span style="color:#8B5CF6;"> (INDEPENDENT)</span>' : ''}</p>
+                    <p><strong>Referred By:</strong> ${user.referredBy || 'None'}</p>
                     <p><strong>Deposits:</strong> ${formatMoney(user.deposits || 0)}</p>
                     <p><strong>Earnings:</strong> ${formatMoney(user.earnings || 0)}</p>
                     <p><strong>Withdrawals:</strong> ${formatMoney(user.withdraws || 0)}</p>
@@ -1801,7 +1722,7 @@
                             </div>
                         </div>
                     ` : '<p><strong>👥 Referrals:</strong> None</p>'}
-                    <p><strong>Status:</strong> ${user.withdrawLocked ? '🔒 Withdraw Locked' : '✅ Active'} ${user.isIndependent ? ' | ⚡ INDEPENDENT' : ''}</p>
+                    <p><strong>Status:</strong> ${user.withdrawLocked ? '🔒 Withdraw Locked' : '✅ Active'}</p>
                     <div style="display: flex; gap: 10px; margin-top: 16px;"><button class="btn btn-primary" id="closeModal">Close</button></div>
                 </div>
             `;
@@ -1845,19 +1766,10 @@
                             <span class="slider"></span>
                         </label>
                     </div>
-                    ${!user?.isIndependent ? `
                     <div class="form-group">
                         <label>👥 Referred By (username)</label>
                         <input type="text" id="editReferredBy" class="edit-input" value="${user?.referredBy || ''}" placeholder="Leave empty for none">
                     </div>
-                    <div class="toggle-group">
-                        <label>⚡ Make Independent (removes referral)</label>
-                        <label class="switch">
-                            <input type="checkbox" id="editIndependent" ${user?.isIndependent ? 'checked' : ''}>
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                    ` : '<div class="alert alert-warning">⚠️ This user is INDEPENDENT. Referral link is removed.</div>'}
                     <div style="display: flex; gap: 10px; margin-top: 16px;">
                         <button class="btn btn-success" id="saveEditBtn">Save Changes</button>
                         <button class="btn btn-secondary" id="cancelEditBtn">Cancel</button>
@@ -1882,7 +1794,6 @@
                 const earnings = parseInt(document.getElementById('editEarnings').value) || 0;
                 const withdrawLocked = document.getElementById('editWithdrawLock').checked;
                 const referredBy = document.getElementById('editReferredBy')?.value || null;
-                const isIndependent = document.getElementById('editIndependent')?.checked || false;
                 
                 if (phone && !/^07\d{8}$/.test(phone)) {
                     showAlert('Phone must start with 07 and be 10 digits', 'error');
@@ -1891,7 +1802,6 @@
                 
                 const updates = { phone, deposits, earnings, withdrawLocked };
                 if (referredBy !== undefined) updates.referredBy = referredBy || null;
-                if (isIndependent !== undefined) updates.isIndependent = isIndependent;
                 if (newPassword && newPassword.length >= 6) {
                     updates.newPassword = newPassword;
                 }

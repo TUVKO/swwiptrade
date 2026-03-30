@@ -2116,14 +2116,14 @@
                                 </thead>
                                 <tbody>
                                     ${INVESTMENT_PLANS.map(p => `
-                                           <tr>
+                                         <tr>
                                             <td style="font-weight: bold;">${formatMoney(p.amount)}</td>
                                             <td style="color: #FFB347;">${formatMoney(p.daily)}</td>
                                             <td style="color: #10B981;">${formatMoney(p.total)}</td>
-                                            </tr>
+                                         </tr>
                                     `).join('')}
                                 </tbody>
-                            </table>
+                             </table>
                         </div>
                         <div class="action-grid mt-2">
                             <button class="btn btn-secondary" id="closeTable">Close</button>
@@ -2257,13 +2257,13 @@
                         </div>
                         <div class="table-wrapper">
                             <table class="investment-table">
-                                <thead> <tr><th>Level</th><th>Commission</th><th>Earned</th> </thead>
+                                <thead> <tr><th>Level</th><th>Commission</th><th>Earned</th> </tr> </thead>
                                 <tbody>
-                                      <tr><td>Level 1</td><td>10%</td><td>${formatMoney(userData?.referralEarnings?.level1 || 0)}</td></tr>
-                                      <tr><td>Level 2</td><td>4%</td><td>${formatMoney(userData?.referralEarnings?.level2 || 0)}</td></tr>
-                                      <tr><td>Level 3</td><td>1%</td><td>${formatMoney(userData?.referralEarnings?.level3 || 0)}</td></tr>
+                                    <tr><td>Level 1</td><td>10%</td><td>${formatMoney(userData?.referralEarnings?.level1 || 0)}</td></tr>
+                                    <tr><td>Level 2</td><td>4%</td><td>${formatMoney(userData?.referralEarnings?.level2 || 0)}</td></tr>
+                                    <tr><td>Level 3</td><td>1%</td><td>${formatMoney(userData?.referralEarnings?.level3 || 0)}</td></tr>
                                 </tbody>
-                            </table>
+                             </table>
                         </div>
                         ${referralsList.length > 0 ? `
                             <div class="referral-list">
