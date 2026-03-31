@@ -19,7 +19,7 @@
         }
 
         .container {
-            max-width: 1400px;
+            max-width: 1200px;
             margin: 0 auto;
             padding: 20px;
         }
@@ -297,22 +297,6 @@
             color: #F59E0B;
         }
 
-        .warning-enabled-badge {
-            display: inline-block;
-            padding: 4px 10px;
-            border-radius: 20px;
-            font-size: 11px;
-            font-weight: bold;
-        }
-        .warning-enabled-badge.enabled {
-            background: #10B98120;
-            color: #10B981;
-        }
-        .warning-enabled-badge.disabled {
-            background: #DC262620;
-            color: #DC2626;
-        }
-
         .modal {
             display: none;
             position: fixed;
@@ -410,6 +394,16 @@
             background: #B91C1C;
         }
 
+        .confirm-input {
+            margin-top: 12px;
+            padding: 8px;
+            border: 1px solid #DC2626;
+            background: #1E1E2A;
+            color: white;
+            border-radius: 8px;
+            width: 100%;
+        }
+
         .whatsapp-preview {
             background: #25D36620;
             border: 1px solid #25D366;
@@ -473,6 +467,15 @@
             padding: 12px;
             margin-bottom: 16px;
             border-left: 4px solid #F59E0B;
+        }
+        
+        .fee-column {
+            color: #EF4444;
+        }
+        
+        .net-column {
+            color: #10B981;
+            font-weight: bold;
         }
         
         .whatsapp-settings-row {
@@ -557,6 +560,12 @@
             margin: 16px 0;
         }
         
+        .last-processed {
+            color: #8E8E93;
+            font-size: 11px;
+            margin-top: 8px;
+        }
+
         .warnings-badge {
             background: #F59E0B;
             color: #000;
@@ -566,44 +575,16 @@
             margin-left: 6px;
         }
 
-        .search-results {
-            background: #0D0E14;
-            border-radius: 16px;
-            padding: 16px;
-            margin-top: 12px;
-        }
-
-        .warning-status-badge {
+        .warning-type {
             display: inline-block;
-            padding: 4px 10px;
-            border-radius: 20px;
-            font-size: 11px;
+            padding: 2px 6px;
+            border-radius: 12px;
+            font-size: 10px;
             font-weight: bold;
         }
-        .warning-status-badge.active {
-            background: #F59E0B20;
-            color: #F59E0B;
-        }
-        .warning-status-badge.resolved {
-            background: #10B98120;
-            color: #10B981;
-        }
-        .warning-status-badge.stopped {
-            background: #6B6B7620;
-            color: #8E8E93;
-        }
-
-        .flex-between {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .warning-actions {
-            display: flex;
-            gap: 5px;
-            flex-wrap: wrap;
-        }
+        .warning-type-critical { background: #DC262620; color: #DC2626; }
+        .warning-type-warning { background: #F59E0B20; color: #F59E0B; }
+        .warning-type-info { background: #3B82F620; color: #3B82F6; }
     </style>
 </head>
 <body>
@@ -653,7 +634,7 @@
             appDownloadDisabled: false,
             warningsEnabled: true
         };
-        let currentTab = 'warnings';
+        let currentTab = 'dashboard';
         let notificationPermission = false;
         let depositListener = null;
         let withdrawalListener = null;
@@ -689,6 +670,15 @@
                 } catch (e) {
                     console.log('Notification error:', e);
                 }
+            }
+        }
+        
+        function updateTabTitle(depositCount, withdrawalCount) {
+            const total = depositCount + withdrawalCount;
+            if (total > 0) {
+                document.title = `(${total}) SWWIPTRADE Admin`;
+            } else {
+                document.title = `SWWIPTRADE Admin`;
             }
         }
         
@@ -747,18 +737,6 @@
                 console.error('Error sending warning:', error);
                 showAlert('Failed to send warning: ' + error.message, 'error');
                 return false;
-            }
-        }
-        
-        async function toggleUserWarnings(userId, enabled) {
-            try {
-                const userRef = doc(db, 'users', userId);
-                await updateDoc(userRef, { warningsEnabled: enabled });
-                showAlert(`Warnings ${enabled ? 'ENABLED' : 'DISABLED'} for user`, 'success');
-                await refreshData();
-            } catch (error) {
-                console.error('Error toggling user warnings:', error);
-                showAlert('Failed to update warning settings', 'error');
             }
         }
         
@@ -838,7 +816,6 @@
             systemSettings.warningsEnabled = enabled;
             await saveSystemSettings();
             showAlert(`Global warnings ${enabled ? 'ENABLED' : 'DISABLED'}`, 'success');
-            renderAdminPanel();
         }
         
         // ========== REAL-TIME DEPOSIT LISTENER ==========
@@ -858,6 +835,7 @@
                                     timestamp: deposit.timestamp || Date.now()
                                 };
                                 pendingDeposits.unshift(newDeposit);
+                                updateTabTitle(pendingDeposits.length, pendingWithdrawalRequests.length);
                                 renderAdminPanel();
                                 playNotificationSound();
                                 showBrowserNotification(
@@ -871,11 +849,13 @@
                     } else if (change.type === 'removed') {
                         const removedId = change.doc.id;
                         pendingDeposits = pendingDeposits.filter(d => d.requestId !== removedId);
+                        updateTabTitle(pendingDeposits.length, pendingWithdrawalRequests.length);
                         renderAdminPanel();
                     } else if (change.type === 'modified') {
                         const deposit = change.doc.data();
                         if (deposit.status !== 'pending') {
                             pendingDeposits = pendingDeposits.filter(d => d.requestId !== change.doc.id);
+                            updateTabTitle(pendingDeposits.length, pendingWithdrawalRequests.length);
                             renderAdminPanel();
                         }
                     }
@@ -902,6 +882,7 @@
                                     timestamp: withdrawal.timestamp || Date.now()
                                 };
                                 pendingWithdrawalRequests.unshift(newWithdrawal);
+                                updateTabTitle(pendingDeposits.length, pendingWithdrawalRequests.length);
                                 renderAdminPanel();
                                 playNotificationSound();
                                 showBrowserNotification(
@@ -915,11 +896,13 @@
                     } else if (change.type === 'removed') {
                         const removedId = change.doc.id;
                         pendingWithdrawalRequests = pendingWithdrawalRequests.filter(w => w.requestId !== removedId);
+                        updateTabTitle(pendingDeposits.length, pendingWithdrawalRequests.length);
                         renderAdminPanel();
                     } else if (change.type === 'modified') {
                         const withdrawal = change.doc.data();
                         if (withdrawal.status !== 'pending') {
                             pendingWithdrawalRequests = pendingWithdrawalRequests.filter(w => w.requestId !== change.doc.id);
+                            updateTabTitle(pendingDeposits.length, pendingWithdrawalRequests.length);
                             renderAdminPanel();
                         }
                     }
@@ -952,10 +935,27 @@
             usersSnapshot.forEach(doc => {
                 const user = doc.data();
                 user.uid = doc.id;
-                if (user.warningsEnabled === undefined) user.warningsEnabled = true;
                 allUsers.push(user);
             });
             return allUsers;
+        }
+        
+        async function loadPendingWithdrawalsFromUsers() {
+            pendingWithdrawals = [];
+            for (const user of allUsers) {
+                const transactions = user.transactions || [];
+                const pending = transactions.filter(t => t.type === 'withdraw' && t.status === 'pending');
+                pending.forEach(t => {
+                    pendingWithdrawals.push({
+                        ...t,
+                        username: user.username,
+                        userId: user.uid,
+                        phone: t.phoneNumber || user.phone,
+                        network: t.network || 'MTN'
+                    });
+                });
+            }
+            return pendingWithdrawals;
         }
         
         async function loadPendingDeposits() {
@@ -1011,21 +1011,32 @@
         // ========== REFERRAL SYSTEM ==========
         async function findUserByUsername(username) {
             if (!username || username.trim() === '') return null;
+            
             const trimmedUsername = username.trim();
+            console.log(`🔍 Searching for user: "${trimmedUsername}"`);
+            
             const exactQuery = query(collection(db, 'users'), where("username", "==", trimmedUsername));
             const exactSnapshot = await getDocs(exactQuery);
+            
             if (!exactSnapshot.empty) {
                 const doc = exactSnapshot.docs[0];
+                console.log(`✅ Found exact match: ${doc.data().username}`);
                 return { id: doc.id, data: doc.data() };
             }
+            
+            console.log(`⚠️ No exact match for "${trimmedUsername}", trying case-insensitive...`);
             const allUsersSnapshot = await getDocs(collection(db, 'users'));
+            
             for (const doc of allUsersSnapshot.docs) {
                 const userData = doc.data();
                 const storedUsername = userData.username;
                 if (storedUsername && storedUsername.toLowerCase() === trimmedUsername.toLowerCase()) {
+                    console.log(`✅ Found case-insensitive match: "${storedUsername}" = "${trimmedUsername}"`);
                     return { id: doc.id, data: userData };
                 }
             }
+            
+            console.log(`❌ No user found with username matching "${trimmedUsername}"`);
             return null;
         }
         
@@ -1036,18 +1047,33 @@
             console.log(`Depositor ID: ${depositorId}`);
             console.log('========================================');
             
-            if (depositAmount <= 0) return;
+            if (depositAmount <= 0) {
+                console.log('❌ Deposit amount is 0, skipping');
+                return;
+            }
             
             try {
                 const depositorRef = doc(db, 'users', depositorId);
                 const depositorSnap = await getDoc(depositorRef);
-                if (!depositorSnap.exists()) return;
+                
+                if (!depositorSnap.exists()) {
+                    console.log('❌ Depositor not found');
+                    return;
+                }
                 
                 const depositor = depositorSnap.data();
+                console.log(`👤 Depositor: ${depositor.username}`);
+                
                 let referrerUsername = depositor.referredBy;
-                if (!referrerUsername || referrerUsername.trim() === '') return;
+                
+                if (!referrerUsername || referrerUsername.trim() === '') {
+                    console.log('ℹ️ No referrer for this user. Skipping commission.');
+                    return;
+                }
                 
                 referrerUsername = referrerUsername.trim();
+                console.log(`🔗 Referrer username from depositor: "${referrerUsername}"`);
+                
                 let level = 1;
                 let commissionRates = { 1: 0.10, 2: 0.04, 3: 0.01 };
                 let commissionsAdded = 0;
@@ -1055,13 +1081,27 @@
                 
                 while (level <= 3 && referrerUsername && !visited.has(referrerUsername)) {
                     visited.add(referrerUsername);
+                    console.log(`\n--- LEVEL ${level} (${commissionRates[level]*100}%) ---`);
+                    
                     const referrerResult = await findUserByUsername(referrerUsername);
-                    if (!referrerResult) break;
+                    
+                    if (!referrerResult) {
+                        console.log(`❌ Referrer "${referrerUsername}" not found. Breaking chain.`);
+                        break;
+                    }
                     
                     const currentReferrerId = referrerResult.id;
                     const currentReferrerData = referrerResult.data;
+                    
+                    console.log(`✅ Found referrer: ${currentReferrerData.username} (ID: ${currentReferrerId})`);
+                    
                     const commissionAmount = depositAmount * commissionRates[level];
-                    if (commissionAmount <= 0) break;
+                    console.log(`💰 Commission to add: ${formatMoney(commissionAmount)}`);
+                    
+                    if (commissionAmount <= 0) {
+                        console.log(`⚠️ Commission amount is 0, skipping`);
+                        break;
+                    }
                     
                     const transactionCount = (currentReferrerData.transactions || []).length;
                     const transactionId = generateTransactionId('referral', transactionCount + 1);
@@ -1080,13 +1120,25 @@
                             status: 'completed'
                         })
                     });
+                    
+                    console.log(`✅ SUCCESS: Added ${formatMoney(commissionAmount)} to ${currentReferrerData.username}`);
                     commissionsAdded++;
+                    
                     referrerUsername = currentReferrerData.referredBy ? currentReferrerData.referredBy.trim() : null;
                     level++;
                 }
+                
+                console.log('\n========================================');
+                console.log(`📊 REFERRAL PROCESSING COMPLETE`);
+                console.log(`Total commissions added: ${commissionsAdded}`);
+                console.log('========================================');
+                
                 if (commissionsAdded > 0) {
                     showAlert(`🎉 Referral commissions added! ${commissionsAdded} upline(s) received bonuses.`, 'success');
+                } else {
+                    console.log('⚠️ No commissions were added');
                 }
+                
             } catch (error) {
                 console.error('❌ Referral commission error:', error);
                 showAlert('Referral processing failed: ' + error.message, 'error');
@@ -1131,7 +1183,7 @@
                             transactionId: depositTxId,
                             type: 'deposit',
                             amount: amount,
-                            description: `Deposit of ${amount} UGX via ${network} Mobile Money`,
+                            description: `Deposit of ${amount} UGX via ${network} Mobile Money (Approved by admin)`,
                             date: new Date().toISOString(),
                             timestamp: depositTimestamp,
                             status: 'completed'
@@ -1151,12 +1203,17 @@
                 
                 systemSettings.adminEarnings += adminCommission;
                 await saveSystemSettings();
+                
+                console.log('🔄 Starting referral commission processing...');
                 await processReferralCommission(userId, amount);
+                
                 await deleteDoc(doc(db, 'depositRequests', requestId));
                 
                 pendingDeposits = pendingDeposits.filter(d => d.requestId !== requestId);
+                updateTabTitle(pendingDeposits.length, pendingWithdrawalRequests.length);
                 renderAdminPanel();
-                showAlert(`✅ Deposit approved!`, 'success');
+                
+                showAlert(`✅ Deposit approved! Admin earned ${formatMoney(adminCommission)} (${systemSettings.adminCommissionRate}%)`, 'success');
                 return true;
             } catch (error) {
                 console.error('Error approving deposit:', error);
@@ -1168,8 +1225,11 @@
         async function rejectDeposit(requestId) {
             try {
                 await deleteDoc(doc(db, 'depositRequests', requestId));
+                
                 pendingDeposits = pendingDeposits.filter(d => d.requestId !== requestId);
+                updateTabTitle(pendingDeposits.length, pendingWithdrawalRequests.length);
                 renderAdminPanel();
+                
                 showAlert('Deposit request rejected and removed.', 'success');
                 return true;
             } catch (error) {
@@ -1190,25 +1250,39 @@
                 `📡 Network: ${network}\n\n` +
                 `Mark as paid?`
             );
+            
             if (!confirmMsg) return false;
             
             try {
                 const userRef = doc(db, 'users', userId);
                 const userSnap = await getDoc(userRef);
+                
                 if (userSnap.exists()) {
                     const user = userSnap.data();
                     const transactions = user.transactions || [];
+                    
                     const updatedTransactions = transactions.map(t => {
                         if (t.transactionId === transactionId || String(t.id) === transactionId) {
-                            return { ...t, status: 'completed', paidAt: new Date().toISOString(), paidAmount: netAmount, paidTo: phoneNumber };
+                            return { 
+                                ...t, 
+                                status: 'completed',
+                                payoutRef: `ADMIN-${Date.now()}`,
+                                paidAt: new Date().toISOString(),
+                                paidAmount: netAmount,
+                                paidTo: phoneNumber
+                            };
                         }
                         return t;
                     });
+                    
                     await updateDoc(userRef, { transactions: updatedTransactions });
                     await deleteDoc(doc(db, 'withdrawalRequests', requestId));
+                    
                     pendingWithdrawalRequests = pendingWithdrawalRequests.filter(w => w.requestId !== requestId);
+                    updateTabTitle(pendingDeposits.length, pendingWithdrawalRequests.length);
                     renderAdminPanel();
-                    showAlert(`✅ Withdrawal approved!`, 'success');
+                    
+                    showAlert(`✅ Withdrawal approved! Sent ${formatMoney(netAmount)} to ${phoneNumber} via ${network}`, 'success');
                     return true;
                 }
             } catch (error) {
@@ -1222,22 +1296,29 @@
             try {
                 const userRef = doc(db, 'users', userId);
                 const userSnap = await getDoc(userRef);
+                
                 if (userSnap.exists()) {
                     const user = userSnap.data();
                     const transactions = user.transactions || [];
+                    
                     const updatedTransactions = transactions.map(t => {
                         if (t.transactionId === transactionId || String(t.id) === transactionId) {
                             return { ...t, status: 'failed' };
                         }
                         return t;
                     });
+                    
                     await updateDoc(userRef, { 
                         transactions: updatedTransactions,
                         earnings: (user.earnings || 0) + amount 
                     });
+                    
                     await deleteDoc(doc(db, 'withdrawalRequests', requestId));
+                    
                     pendingWithdrawalRequests = pendingWithdrawalRequests.filter(w => w.requestId !== requestId);
+                    updateTabTitle(pendingDeposits.length, pendingWithdrawalRequests.length);
                     renderAdminPanel();
+                    
                     showAlert(`Withdrawal rejected! ${formatMoney(amount)} returned to user.`, 'success');
                 }
             } catch (error) {
@@ -1246,11 +1327,58 @@
             }
         }
         
+        async function editUser(userId, updates) {
+            const userRef = doc(db, 'users', userId);
+            const userSnap = await getDoc(userRef);
+            if (!userSnap.exists()) return;
+            
+            const user = userSnap.data();
+            const updateData = {};
+            
+            if (updates.phone && /^07\d{8}$/.test(updates.phone)) updateData.phone = updates.phone;
+            if (updates.password !== undefined) updateData.password = updates.password;
+            if (updates.deposits !== undefined) updateData.deposits = updates.deposits;
+            if (updates.earnings !== undefined) updateData.earnings = updates.earnings;
+            if (updates.withdrawLocked !== undefined) updateData.withdrawLocked = updates.withdrawLocked;
+            if (updates.referredBy !== undefined) updateData.referredBy = updates.referredBy;
+            
+            await updateDoc(userRef, updateData);
+            
+            if (updates.newPassword && updates.newPassword.length >= 6) {
+                try {
+                    const userEmail = user.email;
+                    const userAuth = await signInWithEmailAndPassword(auth, userEmail, updates.password || user.password);
+                    await updatePassword(userAuth.user, updates.newPassword);
+                    await updateDoc(userRef, { password: updates.newPassword });
+                } catch (e) {
+                    console.error('Password update error:', e);
+                    showAlert('Password update failed. User may need to reset manually.', 'error');
+                }
+            }
+            
+            showAlert('User updated successfully!', 'success');
+            await refreshData();
+        }
+        
+        async function toggleUserWithdrawLock(userId, currentLock) {
+            await editUser(userId, { withdrawLocked: !currentLock });
+        }
+        
+        async function deleteUser(userId, username) {
+            if (confirm(`⚠️ Are you sure you want to delete user "${username}"? This action cannot be undone!`)) {
+                await deleteDoc(doc(db, 'users', userId));
+                showAlert(`User "${username}" deleted!`, 'success');
+                await refreshData();
+            }
+        }
+        
         async function refreshData() {
             await loadSystemSettings();
             await loadAllUsers();
+            await loadPendingWithdrawalsFromUsers();
             await loadPendingDeposits();
             await loadPendingWithdrawalRequests();
+            updateTabTitle(pendingDeposits.length, pendingWithdrawalRequests.length);
             renderAdminPanel();
         }
         
@@ -1269,16 +1397,28 @@
         }
         
         function adminLogout() {
-            if (depositListener) { depositListener(); depositListener = null; }
-            if (withdrawalListener) { withdrawalListener(); withdrawalListener = null; }
+            if (depositListener) {
+                depositListener();
+                depositListener = null;
+            }
+            if (withdrawalListener) {
+                withdrawalListener();
+                withdrawalListener = null;
+            }
             currentUser = null;
             localStorage.removeItem('adminLoggedIn');
             showLoginPage();
         }
         
         function showLoginPage() {
-            if (depositListener) { depositListener(); depositListener = null; }
-            if (withdrawalListener) { withdrawalListener(); withdrawalListener = null; }
+            if (depositListener) {
+                depositListener();
+                depositListener = null;
+            }
+            if (withdrawalListener) {
+                withdrawalListener();
+                withdrawalListener = null;
+            }
             document.getElementById('app').innerHTML = `
                 <div class="container">
                     <div class="header">
@@ -1300,6 +1440,29 @@
                 const password = document.getElementById('adminPassword').value;
                 await adminLogin(username, password);
             };
+        }
+        
+        function filterDeposits(searchTerm) {
+            if (!searchTerm) return pendingDeposits;
+            const term = searchTerm.toLowerCase();
+            return pendingDeposits.filter(d => 
+                d.username?.toLowerCase().includes(term) ||
+                d.userPhone?.toLowerCase().includes(term) ||
+                d.depositPhone?.toLowerCase().includes(term) ||
+                String(d.amount).includes(term)
+            );
+        }
+        
+        function filterWithdrawalRequests(searchTerm) {
+            if (!searchTerm) return pendingWithdrawalRequests;
+            const term = searchTerm.toLowerCase();
+            return pendingWithdrawalRequests.filter(w => 
+                w.username?.toLowerCase().includes(term) ||
+                w.userPhone?.toLowerCase().includes(term) ||
+                w.withdrawalPhone?.toLowerCase().includes(term) ||
+                String(w.amount).includes(term) ||
+                (w.transactionId && String(w.transactionId).toLowerCase().includes(term))
+            );
         }
         
         function showWarningModal(user) {
@@ -1335,6 +1498,10 @@ Your account has been flagged for suspicious activity. Please contact support wi
 - SWWIPTRADE Support Team</textarea>
                     </div>
                     
+                    <div class="threshold-info" style="margin-top: 8px;">
+                        <div class="small-text">⚠️ This warning will appear as a full-screen modal to the user. They must click "I UNDERSTAND" to dismiss it. The warning will reappear on every page visit, refresh, and auto-refresh until you resolve it or stop it.</div>
+                    </div>
+                    
                     <div style="display: flex; gap: 10px; margin-top: 16px;">
                         <button class="btn btn-warning" id="sendWarningBtn">⚠️ Send Warning</button>
                         <button class="btn btn-secondary" id="cancelWarningBtn">Cancel</button>
@@ -1360,8 +1527,8 @@ Your account has been flagged for suspicious activity. Please contact support wi
                     message: message
                 });
                 modal.remove();
-                await refreshData();
             };
+            
             document.getElementById('cancelWarningBtn').onclick = () => modal.remove();
         }
         
@@ -1370,27 +1537,14 @@ Your account has been flagged for suspicious activity. Please contact support wi
             const totalEarnings = allUsers.reduce((sum, u) => sum + (u.earnings || 0), 0);
             const totalWithdraws = allUsers.reduce((sum, u) => sum + (u.withdraws || 0), 0);
             const lockedUsers = allUsers.filter(u => u.withdrawLocked === true).length;
-            const usersWithWarningsEnabled = allUsers.filter(u => u.warningsEnabled !== false).length;
+            const whatsappChatLink = systemSettings.whatsappChatLink || "";
+            const whatsappGroupLink = systemSettings.whatsappGroupLink || "";
             
-            // Collect all warnings for history
-            let allWarningsList = [];
-            allUsers.forEach(user => {
-                const warnings = user.warnings || [];
-                warnings.forEach(w => {
-                    allWarningsList.push({
-                        ...w,
-                        username: user.username,
-                        userId: user.uid,
-                        userPhone: user.phone
-                    });
-                });
-            });
-            allWarningsList.sort((a, b) => b.sentAtTimestamp - a.sentAtTimestamp);
+            const depositSearchTerm = sessionStorage.getItem('depositSearch') || '';
+            const withdrawalSearchTerm = sessionStorage.getItem('withdrawalSearch') || '';
             
-            const totalWarnings = allWarningsList.length;
-            const activeWarnings = allWarningsList.filter(w => w.status === 'active' && !w.stopShowing).length;
-            const resolvedWarnings = allWarningsList.filter(w => w.status === 'resolved').length;
-            const stoppedWarnings = allWarningsList.filter(w => w.stopShowing === true).length;
+            const filteredDeposits = filterDeposits(depositSearchTerm);
+            const filteredWithdrawals = filterWithdrawalRequests(withdrawalSearchTerm);
             
             document.getElementById('app').innerHTML = `
                 <div class="container">
@@ -1415,7 +1569,6 @@ Your account has been flagged for suspicious activity. Please contact support wi
                         <button class="tab-btn ${currentTab === 'deposits' ? 'active' : ''}" data-tab="deposits">💰 Deposits <span class="badge-count">${pendingDeposits.length}</span></button>
                         <button class="tab-btn ${currentTab === 'withdrawals' ? 'active' : ''}" data-tab="withdrawals">💸 Withdrawals <span class="badge-count">${pendingWithdrawalRequests.length}</span></button>
                         <button class="tab-btn ${currentTab === 'users' ? 'active' : ''}" data-tab="users">👥 Users</button>
-                        <button class="tab-btn ${currentTab === 'warnings' ? 'active' : ''}" data-tab="warnings">⚠️ WARNINGS <span class="badge-count">${activeWarnings}</span></button>
                         <button class="tab-btn ${currentTab === 'settings' ? 'active' : ''}" data-tab="settings">⚙️ Settings</button>
                     </div>
                     
@@ -1429,28 +1582,33 @@ Your account has been flagged for suspicious activity. Please contact support wi
                     </div>
                     
                     <div id="depositsTab" style="display: ${currentTab === 'deposits' ? 'block' : 'none'}">
-                        <input type="text" id="searchDeposits" class="search-box" placeholder="🔍 Search by username, registered phone, deposit phone, or amount...">
-                        ${pendingDeposits.length === 0 ? '<div class="alert alert-success">No pending deposit requests</div>' : `
+                        <input type="text" id="searchDeposits" class="search-box" placeholder="🔍 Search by username, registered phone, deposit phone, or amount..." value="${depositSearchTerm}">
+                        ${filteredDeposits.length === 0 ? '<div class="alert alert-success">No pending deposit requests</div>' : `
                             <div class="table-wrapper">
-                                <table>
+                                 <table>
                                     <thead>
-                                        <tr><th>User</th><th>Amount</th><th>User's Phone</th><th>Deposit Phone</th><th>Network</th><th>Date</th><th>Actions</th></tr>
+                                         <tr><th>User</th><th>Amount</th><th>User's Phone</th><th>Deposit Phone</th><th>Network</th><th>Admin Fee (${systemSettings.adminCommissionRate}%)</th><th>Total to Request</th><th>Date</th><th>Actions</th></tr>
                                     </thead>
-                                    <tbody id="depositsTableBody">
-                                        ${pendingDeposits.map(d => `
-                                            <tr>
-                                                <td><strong>${d.username}</strong></td>
-                                                <td>${formatMoney(d.amount)}</td>
-                                                <td>${d.userPhone || 'N/A'}</td>
-                                                <td>${d.depositPhone || 'N/A'}</td>
-                                                <td><span class="network-badge">📱 ${d.network || 'MTN'}</span></td>
-                                                <td>${new Date(d.timestamp).toLocaleString()}</td>
-                                                <td>
-                                                    <button class="btn btn-success approve-deposit" data-request-id="${d.requestId}" data-user-id="${d.userId}" data-amount="${d.amount}" data-phone="${d.depositPhone}" data-network="${d.network || 'MTN'}">✅ Approve</button>
-                                                    <button class="btn btn-danger reject-deposit" data-request-id="${d.requestId}">❌ Reject</button>
-                                                </td>
-                                            </tr>
-                                        `).join('')}
+                                    <tbody>
+                                        ${filteredDeposits.map(d => {
+                                            const adminFee = d.amount * (systemSettings.adminCommissionRate / 100);
+                                            const totalToRequest = d.amount + adminFee;
+                                            return `
+                                                <tr>
+                                                    <td><strong>${d.username}</strong></td>
+                                                    <td>${formatMoney(d.amount)}</td>
+                                                    <td>${d.userPhone || 'N/A'}</td>
+                                                    <td>${d.depositPhone || 'N/A'}</td>
+                                                    <td><span class="network-badge">📱 ${d.network || 'MTN'}</span></td>
+                                                    <td class="admin-fee">${formatMoney(adminFee)} (${systemSettings.adminCommissionRate}%)</td>
+                                                    <td class="total-request">${formatMoney(totalToRequest)}</td>
+                                                    <td>${new Date(d.timestamp).toLocaleString()}</td>
+                                                    <td>
+                                                        <button class="btn btn-success" data-request-id="${d.requestId}" data-user-id="${d.userId}" data-amount="${d.amount}" data-phone="${d.depositPhone}" data-network="${d.network || 'MTN'}">✅ Approve</button>
+                                                        <button class="btn btn-danger" data-request-id="${d.requestId}">❌ Reject</button>
+                                                    </td>
+                                                </tr>
+                                            `}).join('')}
                                     </tbody>
                                 </table>
                             </div>
@@ -1458,15 +1616,15 @@ Your account has been flagged for suspicious activity. Please contact support wi
                     </div>
                     
                     <div id="withdrawalsTab" style="display: ${currentTab === 'withdrawals' ? 'block' : 'none'}">
-                        <input type="text" id="searchWithdrawals" class="search-box" placeholder="🔍 Search by username, phone, amount...">
-                        ${pendingWithdrawalRequests.length === 0 ? '<div class="alert alert-success">No pending withdrawal requests</div>' : `
+                        <input type="text" id="searchWithdrawals" class="search-box" placeholder="🔍 Search by username, registered phone, withdrawal phone, amount, or transaction ID..." value="${withdrawalSearchTerm}">
+                        ${filteredWithdrawals.length === 0 ? '<div class="alert alert-success">No pending withdrawal requests</div>' : `
                             <div class="table-wrapper">
                                 <table>
                                     <thead>
-                                        <tr><th>User</th><th>Requested</th><th>Fee (10%)</th><th>Net to Pay</th><th>Withdrawal Phone</th><th>Network</th><th>Date</th><th>Actions</th></tr>
+                                        <tr><th>User</th><th>Requested</th><th>Fee (10%)</th><th>Net to Pay</th><th>User's Phone</th><th>Withdrawal Phone</th><th>Network</th><th>Date</th><th>Transaction ID</th><th>Actions</th></tr>
                                     </thead>
-                                    <tbody id="withdrawalsTableBody">
-                                        ${pendingWithdrawalRequests.map(w => {
+                                    <tbody>
+                                        ${filteredWithdrawals.map(w => {
                                             const fee = w.amount * 0.1;
                                             const netAmount = w.amount - fee;
                                             return `
@@ -1474,13 +1632,15 @@ Your account has been flagged for suspicious activity. Please contact support wi
                                                     <td><strong>${w.username}</strong></td>
                                                     <td style="color: #FFB347;">${formatMoney(w.amount)}</td>
                                                     <td style="color: #EF4444;">-${formatMoney(fee)}</td>
-                                                    <td style="color: #10B981;">${formatMoney(netAmount)}</td>
-                                                    <td>${w.withdrawalPhone || w.userPhone || 'N/A'}</td>
+                                                    <td style="color: #10B981; font-weight: bold;">${formatMoney(netAmount)}</td>
+                                                    <td>${w.userPhone || 'N/A'}</td>
+                                                    <td>${w.withdrawalPhone || w.phone || 'N/A'}</td>
                                                     <td><span class="network-badge">📱 ${w.network || 'MTN'}</span></td>
                                                     <td>${new Date(w.timestamp).toLocaleString()}</td>
+                                                    <td><small>${w.transactionId || w.id}</small></td>
                                                     <td>
-                                                        <button class="btn btn-success approve-withdrawal" data-request-id="${w.requestId}" data-user-id="${w.userId}" data-amount="${w.amount}" data-phone="${w.withdrawalPhone || w.userPhone}" data-network="${w.network || 'MTN'}" data-txid="${w.transactionId}" data-fee="${fee}" data-net="${netAmount}">✅ Approve</button>
-                                                        <button class="btn btn-danger reject-withdrawal" data-request-id="${w.requestId}" data-user-id="${w.userId}" data-amount="${w.amount}" data-txid="${w.transactionId}">❌ Reject</button>
+                                                        <button class="btn btn-success" data-request-id="${w.requestId}" data-user-id="${w.userId}" data-amount="${w.amount}" data-phone="${w.withdrawalPhone || w.phone}" data-network="${w.network || 'MTN'}" data-txid="${w.transactionId}" data-fee="${fee}" data-net="${netAmount}">✅ Approve</button>
+                                                        <button class="btn btn-danger" data-request-id="${w.requestId}" data-user-id="${w.userId}" data-amount="${w.amount}" data-txid="${w.transactionId}">❌ Reject</button>
                                                     </td>
                                                 </tr>
                                             `}).join('')}
@@ -1499,243 +1659,201 @@ Your account has been flagged for suspicious activity. Please contact support wi
                                 </thead>
                                 <tbody id="usersTableBody">
                                     ${allUsers.map(user => {
-                                        const activeWarningsCount = (user.warnings || []).filter(w => w.status === 'active' && !w.stopShowing).length;
+                                        const activeWarnings = (user.warnings || []).filter(w => w.status === 'active' && !w.stopShowing).length;
                                         return `
-                                            <tr>
-                                                <td><strong>${user.username}</strong></td>
-                                                <td>${user.phone || 'N/A'}</td>
-                                                <td>${formatMoney(user.deposits || 0)}</td>
-                                                <td>${formatMoney(user.earnings || 0)}</td>
-                                                <td>${formatMoney(user.withdraws || 0)}</td>
-                                                <td>${user.referrals?.length || 0}</td>
-                                                <td>${activeWarningsCount > 0 ? `<span class="warnings-badge">⚠️ ${activeWarningsCount}</span>` : '✅ 0'}</td>
-                                                <td><span class="status-badge ${user.withdrawLocked ? 'status-locked' : 'status-active'}">${user.withdrawLocked ? '🔒 Locked' : '✅ Active'}</span></td>
-                                                <td>
-                                                    <button class="btn btn-primary view-user" data-user-id="${user.uid}">📋 View</button>
-                                                    <button class="btn btn-warning send-warning" data-user-id="${user.uid}" data-username="${user.username}" data-phone="${user.phone || ''}">⚠️ Warn</button>
-                                                    <button class="btn ${user.withdrawLocked ? 'btn-success' : 'btn-warning'} toggle-lock" data-user-id="${user.uid}" data-locked="${user.withdrawLocked || false}">${user.withdrawLocked ? '🔓 Unlock' : '🔒 Lock'}</button>
-                                                    <button class="btn btn-danger delete-user" data-user-id="${user.uid}" data-username="${user.username}">🗑️ Delete</button>
-                                                </td>
-                                            </tr>
-                                        `}).join('')}
-                                    </tbody>
-                                </table>
+                                        <tr>
+                                            <td><strong>${user.username}</strong></td>
+                                            <td>${user.phone || 'N/A'}</td>
+                                            <td>${formatMoney(user.deposits || 0)}</td>
+                                            <td>${formatMoney(user.earnings || 0)}</td>
+                                            <td>${formatMoney(user.withdraws || 0)}</td>
+                                            <td>${user.referrals?.length || 0}</td>
+                                            <td>${activeWarnings > 0 ? `<span class="warnings-badge">⚠️ ${activeWarnings}</span>` : '0'}</td>
+                                            <td><span class="status-badge ${user.withdrawLocked ? 'status-locked' : 'status-active'}">${user.withdrawLocked ? '🔒 Locked' : '✅ Active'}</span></td>
+                                            <td>
+                                                <button class="btn btn-primary" onclick="window.viewUserDetails('${user.uid}')">📋 View</button>
+                                                <button class="btn btn-warning" onclick="window.editUserModal('${user.uid}', '${user.username}', '${user.phone || ''}', ${user.deposits || 0}, ${user.earnings || 0}, ${user.withdrawLocked || false}, '${user.password || ''}')">✏️ Edit</button>
+                                                <button class="btn btn-warn" onclick="window.showWarningModal('${user.uid}', '${user.username}', '${user.phone || ''}')">⚠️ Warn</button>
+                                                <button class="btn ${user.withdrawLocked ? 'btn-success' : 'btn-warning'}" onclick="window.toggleWithdrawLock('${user.uid}', ${user.withdrawLocked || false})">${user.withdrawLocked ? '🔓 Unlock' : '🔒 Lock'}</button>
+                                                <button class="btn btn-danger" onclick="window.deleteUserAccount('${user.uid}', '${user.username}')">🗑️ Delete</button>
+                                            </td>
+                                        </tr>
+                                    `}).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <div id="settingsTab" style="display: ${currentTab === 'settings' ? 'block' : 'none'}">
+                        <div class="settings-group">
+                            <h3>⚠️ Warning System Controls</h3>
+                            <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                                <span>🔔 Enable Warnings for All Users</span>
+                                <label class="switch">
+                                    <input type="checkbox" id="globalWarningsToggle" ${systemSettings.warningsEnabled !== false ? 'checked' : ''}>
+                                    <span class="slider"></span>
+                                </label>
+                            </label>
+                            <div class="small-text" style="margin-top: 4px; color: #F59E0B;">
+                                ⚠️ When DISABLED, no warnings will appear on any user dashboard
+                            </div>
+                            <div class="small-text" style="margin-top: 8px;">
+                                Current Status: ${systemSettings.warningsEnabled !== false ? '🟢 ENABLED - Warnings are active' : '🔴 DISABLED - No warnings appear'}
                             </div>
                         </div>
                         
-                        <div id="warningsTab" style="display: ${currentTab === 'warnings' ? 'block' : 'none'}">
-                            <!-- Global Toggle -->
-                            <div class="settings-group">
-                                <div class="flex-between">
-                                    <div>
-                                        <h3>🔔 GLOBAL WARNING CONTROL</h3>
-                                        <div class="small-text">Master switch for ALL users</div>
-                                    </div>
-                                    <label class="switch">
-                                        <input type="checkbox" id="globalWarningsToggle" ${systemSettings.warningsEnabled !== false ? 'checked' : ''}>
-                                        <span class="slider"></span>
-                                    </label>
-                                </div>
-                                <div class="small-text" style="margin-top: 8px;">
-                                    Current Status: ${systemSettings.warningsEnabled !== false ? '🟢 ENABLED - Warnings active for all users' : '🔴 DISABLED - No warnings appear'}
-                                </div>
+                        <div class="settings-group">
+                            <h3>💬 WhatsApp Settings</h3>
+                            <div class="whatsapp-settings-row">
+                                <label>📱 Customer Care Chat Link (Floating Button)</label>
+                                <input type="text" id="whatsappChatLink" placeholder="https://wa.me/2567XXXXXXXX" value="${whatsappChatLink}">
+                                <div class="whatsapp-preview">💬 Preview: <a href="${whatsappChatLink || '#'}" target="_blank" id="chatPreviewLink">${whatsappChatLink || 'Not set'}</a></div>
+                                <div class="small-text">This link opens a direct chat with customer care (floating icon on user dashboard). Leave empty to hide the button.</div>
                             </div>
-                            
-                            <!-- Search User Section -->
-                            <div class="settings-group">
-                                <h3>🔍 SEARCH & SEND WARNING</h3>
-                                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                                    <input type="text" id="searchUserInput" placeholder="Search by username or phone..." style="flex: 2;">
-                                    <button class="btn btn-primary" id="searchUserBtn">🔍 Search</button>
-                                </div>
-                                <div id="searchResults" style="margin-top: 16px;"></div>
+                            <div class="whatsapp-settings-row">
+                                <label>👥 WhatsApp Group Link (Join Group Button)</label>
+                                <input type="text" id="whatsappGroupLink" placeholder="https://chat.whatsapp.com/xxxxx" value="${whatsappGroupLink}">
+                                <div class="whatsapp-preview">💬 Preview: <a href="${whatsappGroupLink || '#'}" target="_blank" id="groupPreviewLink">${whatsappGroupLink || 'Not set'}</a></div>
+                                <div class="small-text">This link opens a WhatsApp group for users to join. Leave empty to hide the button.</div>
                             </div>
-                            
-                            <!-- Per-User Warning Control Table -->
-                            <div class="settings-group">
-                                <h3>👥 PER-USER WARNING CONTROL</h3>
-                                <input type="text" id="filterUsersWarnings" class="search-box" placeholder="🔍 Filter by username or phone...">
-                                <div class="table-wrapper">
-                                    <table>
-                                        <thead>
-                                            <tr><th>Username</th><th>Phone</th><th>Active Warnings</th><th>Warning Status</th><th>Actions</th></tr>
-                                        </thead>
-                                        <tbody id="perUserWarningsTableBody">
-                                            ${allUsers.map(user => {
-                                                const activeWarningsCount = (user.warnings || []).filter(w => w.status === 'active' && !w.stopShowing).length;
-                                                const warningsEnabled = user.warningsEnabled !== false;
-                                                return `
-                                                    <tr>
-                                                        <td><strong>${user.username}</strong></td>
-                                                        <td>${user.phone || 'N/A'}</td>
-                                                        <td>${activeWarningsCount > 0 ? `<span class="warnings-badge">⚠️ ${activeWarningsCount}</span>` : '✅ 0'}</td>
-                                                        <td>
-                                                            <span class="warning-enabled-badge ${warningsEnabled ? 'enabled' : 'disabled'}">
-                                                                ${warningsEnabled ? '🟢 ENABLED' : '🔴 DISABLED'}
-                                                            </span>
-                                                        </td>
-                                                        <td class="warning-actions">
-                                                            <button class="btn btn-sm btn-primary view-user-warnings" data-user-id="${user.uid}">📋 View</button>
-                                                            <button class="btn btn-sm btn-warning send-warning-user" data-user-id="${user.uid}" data-username="${user.username}" data-phone="${user.phone || ''}">⚠️ Send</button>
-                                                            ${warningsEnabled ? 
-                                                                `<button class="btn btn-sm btn-danger disable-warnings" data-user-id="${user.uid}">🔴 Disable</button>` :
-                                                                `<button class="btn btn-sm btn-success enable-warnings" data-user-id="${user.uid}">🟢 Enable</button>`
-                                                            }
-                                                        </td>
-                                                    </tr>
-                                                `}).join('')}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                            
-                            <!-- All Warnings History -->
-                            <div class="settings-group">
-                                <h3>📋 ALL WARNINGS HISTORY</h3>
-                                <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px;">
-                                    <select id="historyUserFilter" style="width: 200px;">
-                                        <option value="">All Users</option>
-                                        ${allUsers.map(user => `<option value="${user.uid}">${user.username}</option>`).join('')}
-                                    </select>
-                                    <select id="historyStatusFilter" style="width: 150px;">
-                                        <option value="all">All Status</option>
-                                        <option value="active">Active</option>
-                                        <option value="resolved">Resolved</option>
-                                        <option value="stopped">Stopped</option>
-                                    </select>
-                                    <input type="text" id="historySearchInput" placeholder="Search by subject..." style="flex: 2;">
-                                    <button class="btn btn-primary" id="applyHistoryFilters">Apply Filters</button>
-                                </div>
-                                
-                                <div class="stats-grid" style="margin-bottom: 16px;">
-                                    <div class="stat-card"><div class="label">📊 Total Warnings</div><div class="value">${totalWarnings}</div></div>
-                                    <div class="stat-card"><div class="label">🟡 Active</div><div class="value">${activeWarnings}</div></div>
-                                    <div class="stat-card"><div class="label">✅ Resolved</div><div class="value">${resolvedWarnings}</div></div>
-                                    <div class="stat-card"><div class="label">⛔ Stopped</div><div class="value">${stoppedWarnings}</div></div>
-                                </div>
-                                
-                                <div class="table-wrapper">
-                                    <table>
-                                        <thead>
-                                            <tr><th>User</th><th>Subject</th><th>Type</th><th>Date</th><th>Status</th><th>Actions</th></tr>
-                                        </thead>
-                                        <tbody id="warningsHistoryBody">
-                                            ${allWarningsList.slice(0, 50).map(w => `
-                                                <tr>
-                                                    <td><strong>${w.username}</strong><br><span class="small-text">${w.userPhone || ''}</span></td>
-                                                    <td>${w.subject}</td>
-                                                    <td><span class="warning-type ${w.type === 'warning' ? 'warning-type-warning' : 'warning-type-critical'}">${w.type}</span></td>
-                                                    <td>${new Date(w.sentAtTimestamp).toLocaleString()}</td>
-                                                    <td>
-                                                        ${w.status === 'active' && !w.stopShowing ? '<span class="warning-status-badge active">🟡 Active</span>' : ''}
-                                                        ${w.status === 'resolved' ? '<span class="warning-status-badge resolved">✅ Resolved</span>' : ''}
-                                                        ${w.stopShowing === true ? '<span class="warning-status-badge stopped">⛔ Stopped</span>' : ''}
-                                                    </td>
-                                                    <td class="warning-actions">
-                                                        ${w.status === 'active' && !w.stopShowing ? `<button class="btn btn-sm btn-success resolve-warning" data-user-id="${w.userId}" data-warning-id="${w.id}">Resolve</button>` : ''}
-                                                        ${w.status === 'active' && !w.stopShowing ? `<button class="btn btn-sm btn-warning stop-warning" data-user-id="${w.userId}" data-warning-id="${w.id}">Stop</button>` : ''}
-                                                        <button class="btn btn-sm btn-danger delete-warning" data-user-id="${w.userId}" data-warning-id="${w.id}">Delete</button>
-                                                    </td>
-                                                </tr>
-                                            `).join('')}
-                                        </tbody>
-                                    </table>
-                                </div>
-                                ${allWarningsList.length > 50 ? '<div class="small-text text-center mt-2">Showing last 50 warnings. Use filters to narrow down.</div>' : ''}
+                            <button class="btn btn-primary" id="saveWhatsappLinksBtn">Save WhatsApp Links</button>
+                            <button class="btn btn-success" id="testChatLinkBtn">📱 Test Chat Link</button>
+                            <button class="btn btn-success" id="testGroupLinkBtn">👥 Test Group Link</button>
+                        </div>
+                        
+                        <div class="settings-group">
+                            <h3>💰 Admin Commission Settings</h3>
+                            <label>Deposit Commission Rate (%)</label>
+                            <input type="number" id="adminCommissionRate" step="0.1" min="0" max="100" value="${systemSettings.adminCommissionRate}">
+                            <div class="small-text" style="margin-top: 4px;">You earn this percentage on every approved deposit</div>
+                            <div class="small-text" style="margin-top: 8px; color: #FFB347;">💰 Current Admin Earnings: ${formatMoney(systemSettings.adminEarnings)}</div>
+                            <button class="btn btn-primary" id="saveCommissionBtn" style="margin-top: 12px;">Save Commission Rate</button>
+                        </div>
+                        
+                        <div class="settings-group">
+                            <h3>🔒 System Controls</h3>
+                            <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                                <span>Block All Withdrawals (Hidden Lock - Users see "Insufficient Balance")</span>
+                                <label class="switch">
+                                    <input type="checkbox" id="globalWithdrawLock" ${systemSettings.withdrawLocked ? 'checked' : ''}>
+                                    <span class="slider"></span>
+                                </label>
+                            </label>
+                            <div class="small-text" style="margin-top: 4px; color: #F59E0B;">
+                                ⚠️ When enabled, users see "Insufficient Balance" even if they have enough funds
                             </div>
                         </div>
                         
-                        <div id="settingsTab" style="display: ${currentTab === 'settings' ? 'block' : 'none'}">
-                            <div class="settings-group">
-                                <h3>💬 WhatsApp Settings</h3>
-                                <div class="whatsapp-settings-row">
-                                    <label>📱 Customer Care Chat Link (Floating Button)</label>
-                                    <input type="text" id="whatsappChatLink" placeholder="https://wa.me/2567XXXXXXXX" value="${systemSettings.whatsappChatLink || ''}">
-                                    <div class="small-text">This link opens a direct chat with customer care (floating icon on user dashboard).</div>
-                                </div>
-                                <div class="whatsapp-settings-row">
-                                    <label>👥 WhatsApp Group Link (Join Group Button)</label>
-                                    <input type="text" id="whatsappGroupLink" placeholder="https://chat.whatsapp.com/xxxxx" value="${systemSettings.whatsappGroupLink || ''}">
-                                    <div class="small-text">This link opens a WhatsApp group for users to join.</div>
-                                </div>
-                                <button class="btn btn-primary" id="saveWhatsappLinksBtn">Save WhatsApp Links</button>
+                        <div class="settings-group">
+                            <h3>📱 App Download Controls</h3>
+                            <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                                <span>Disable App Download Button</span>
+                                <label class="switch">
+                                    <input type="checkbox" id="disableAppDownload" ${systemSettings.appDownloadDisabled ? 'checked' : ''}>
+                                    <span class="slider"></span>
+                                </label>
+                            </label>
+                            <div class="small-text" style="margin-top: 4px; color: #F59E0B;">
+                                ⚠️ When enabled, the "Download App" button becomes unclickable for all users
                             </div>
-                            
-                            <div class="settings-group">
-                                <h3>💰 Admin Commission Settings</h3>
-                                <label>Deposit Commission Rate (%)</label>
-                                <input type="number" id="adminCommissionRate" step="0.1" min="0" max="100" value="${systemSettings.adminCommissionRate}">
-                                <div class="small-text">You earn this percentage on every approved deposit</div>
-                                <div class="small-text" style="margin-top: 8px; color: #FFB347;">💰 Current Admin Earnings: ${formatMoney(systemSettings.adminEarnings)}</div>
-                                <button class="btn btn-primary" id="saveCommissionBtn" style="margin-top: 12px;">Save Commission Rate</button>
+                        </div>
+                        
+                        <div class="settings-group">
+                            <h3>⚙️ System Settings</h3>
+                            <input type="number" id="minDeposit" placeholder="Minimum Deposit" value="${systemSettings.minDeposit}">
+                            <input type="number" id="minWithdraw" placeholder="Minimum Withdrawal" value="${systemSettings.minWithdraw}">
+                            <input type="number" id="withdrawFee" placeholder="Withdrawal Fee (%)" value="${systemSettings.withdrawFee}">
+                            <input type="number" id="dailyProfit" placeholder="Daily Profit (%)" value="${systemSettings.dailyProfit}">
+                            <button class="btn btn-primary" id="saveSettingsBtn">Save Settings</button>
+                        </div>
+                        
+                        <hr>
+                        
+                        <div class="settings-group danger-zone">
+                            <h3>⚠️ DANGER ZONE - Delete Data</h3>
+                            <div class="danger-btn-group">
+                                <button class="btn danger-btn" id="deleteAllUsersBtn">🗑️ Delete All Users</button>
+                                <button class="btn danger-btn" id="deleteAllDepositsBtn">🗑️ Delete All Deposits</button>
+                                <button class="btn danger-btn" id="deleteAllWithdrawalsBtn">🗑️ Delete All Withdrawals</button>
+                                <button class="btn danger-btn" id="deleteAllDataBtn" style="background: #B91C1C;">🔴 DELETE EVERYTHING</button>
                             </div>
-                            
-                            <div class="settings-group">
-                                <h3>🔒 System Controls</h3>
-                                <div class="flex-between">
-                                    <span>Block All Withdrawals (Hidden Lock)</span>
-                                    <label class="switch">
-                                        <input type="checkbox" id="globalWithdrawLock" ${systemSettings.withdrawLocked ? 'checked' : ''}>
-                                        <span class="slider"></span>
-                                    </label>
-                                </div>
-                                <div class="small-text" style="margin-top: 8px;">When enabled, users see "Insufficient Balance" even if they have enough funds</div>
-                            </div>
-                            
-                            <div class="settings-group">
-                                <h3>📱 App Download Controls</h3>
-                                <div class="flex-between">
-                                    <span>Disable App Download Button</span>
-                                    <label class="switch">
-                                        <input type="checkbox" id="disableAppDownload" ${systemSettings.appDownloadDisabled ? 'checked' : ''}>
-                                        <span class="slider"></span>
-                                    </label>
-                                </div>
-                                <div class="small-text">When enabled, the "Download App" button becomes unclickable for all users</div>
-                            </div>
-                            
-                            <div class="settings-group danger-zone">
-                                <h3>⚠️ DANGER ZONE - Delete Data</h3>
-                                <div class="danger-btn-group">
-                                    <button class="btn danger-btn" id="deleteAllUsersBtn">🗑️ Delete All Users</button>
-                                    <button class="btn danger-btn" id="deleteAllDepositsBtn">🗑️ Delete All Deposits</button>
-                                    <button class="btn danger-btn" id="deleteAllWithdrawalsBtn">🗑️ Delete All Withdrawals</button>
-                                    <button class="btn danger-btn" id="deleteAllDataBtn" style="background: #B91C1C;">🔴 DELETE EVERYTHING</button>
-                                </div>
-                                <div class="small-text" style="margin-top: 12px;">⚠️ These actions delete Firestore data only. Admin login credentials remain unchanged.</div>
+                            <div class="small-text" style="margin-top: 12px; color: #F59E0B;">
+                                ⚠️ These actions delete Firestore data only. Admin login credentials remain unchanged.<br>
+                                🔴 "DELETE EVERYTHING" requires typing "DELETE" to confirm.
                             </div>
                         </div>
                     </div>
-                `;
+                </div>
+            `;
             
-            // Tab switching
+            document.getElementById('logoutBtn').onclick = () => adminLogout();
+            document.getElementById('downloadAppBtn')?.addEventListener('click', () => {
+                window.open(APK_DOWNLOAD_URL, '_blank');
+            });
+            
             document.querySelectorAll('.tab-btn').forEach(btn => {
                 btn.onclick = () => { currentTab = btn.dataset.tab; renderAdminPanel(); };
             });
             
-            // Logout
-            document.getElementById('logoutBtn')?.addEventListener('click', adminLogout);
-            document.getElementById('downloadAppBtn')?.addEventListener('click', () => window.open(APK_DOWNLOAD_URL, '_blank'));
+            document.querySelectorAll('#depositsTab .btn-success').forEach(btn => {
+                btn.onclick = async () => {
+                    const requestId = btn.dataset.requestId;
+                    const userId = btn.dataset.userId;
+                    const amount = parseFloat(btn.dataset.amount);
+                    const phone = btn.dataset.phone;
+                    const network = btn.dataset.network;
+                    await approveDeposit(requestId, userId, amount, phone, network);
+                };
+            });
             
-            // Global Warnings Toggle
+            document.querySelectorAll('#depositsTab .btn-danger').forEach(btn => {
+                btn.onclick = async () => {
+                    const requestId = btn.dataset.requestId;
+                    await rejectDeposit(requestId);
+                };
+            });
+            
+            document.querySelectorAll('#withdrawalsTab .btn-success').forEach(btn => {
+                btn.onclick = async () => {
+                    const requestId = btn.dataset.requestId;
+                    const userId = btn.dataset.userId;
+                    const amount = parseFloat(btn.dataset.amount);
+                    const phone = btn.dataset.phone;
+                    const network = btn.dataset.network;
+                    const txid = btn.dataset.txid;
+                    const fee = parseFloat(btn.dataset.fee);
+                    const net = parseFloat(btn.dataset.net);
+                    await approveWithdrawalRequest(requestId, userId, amount, phone, network, txid, fee, net);
+                };
+            });
+            
+            document.querySelectorAll('#withdrawalsTab .btn-danger').forEach(btn => {
+                btn.onclick = async () => {
+                    const requestId = btn.dataset.requestId;
+                    const userId = btn.dataset.userId;
+                    const amount = parseFloat(btn.dataset.amount);
+                    const txid = btn.dataset.txid;
+                    await rejectWithdrawalRequest(requestId, userId, amount, txid);
+                };
+            });
+            
             const globalWarningsToggle = document.getElementById('globalWarningsToggle');
             if (globalWarningsToggle) {
                 globalWarningsToggle.onchange = async (e) => {
                     await toggleGlobalWarnings(e.target.checked);
+                    renderAdminPanel();
                 };
             }
             
-            // Global Withdraw Lock
             const globalLock = document.getElementById('globalWithdrawLock');
             if (globalLock) {
                 globalLock.onchange = async (e) => {
                     systemSettings.withdrawLocked = e.target.checked;
                     await saveSystemSettings();
-                    showAlert(`Global withdraw lock ${systemSettings.withdrawLocked ? 'ENABLED' : 'DISABLED'}`, 'success');
+                    showAlert(`Global withdraw lock ${systemSettings.withdrawLocked ? 'ENABLED' : 'DISABLED'} - Users will see "Insufficient Balance" when locked`, 'success');
                 };
             }
             
-            // Disable App Download
             const disableAppDownload = document.getElementById('disableAppDownload');
             if (disableAppDownload) {
                 disableAppDownload.onchange = async (e) => {
@@ -1745,7 +1863,11 @@ Your account has been flagged for suspicious activity. Please contact support wi
                 };
             }
             
-            // Save WhatsApp Links
+            document.getElementById('deleteAllUsersBtn')?.addEventListener('click', deleteAllUsers);
+            document.getElementById('deleteAllDepositsBtn')?.addEventListener('click', deleteAllDepositRequests);
+            document.getElementById('deleteAllWithdrawalsBtn')?.addEventListener('click', deleteAllWithdrawalRequests);
+            document.getElementById('deleteAllDataBtn')?.addEventListener('click', deleteAllData);
+            
             const saveWhatsappLinksBtn = document.getElementById('saveWhatsappLinksBtn');
             if (saveWhatsappLinksBtn) {
                 saveWhatsappLinksBtn.onclick = async () => {
@@ -1753,263 +1875,149 @@ Your account has been flagged for suspicious activity. Please contact support wi
                     systemSettings.whatsappGroupLink = document.getElementById('whatsappGroupLink').value;
                     await saveSystemSettings();
                     showAlert('WhatsApp links saved!', 'success');
+                    renderAdminPanel();
                 };
             }
             
-            // Save Commission Rate
+            const testChatLinkBtn = document.getElementById('testChatLinkBtn');
+            if (testChatLinkBtn) {
+                testChatLinkBtn.onclick = () => {
+                    const link = document.getElementById('whatsappChatLink').value;
+                    if (link) window.open(link, '_blank');
+                    else showAlert('No chat link set', 'error');
+                };
+            }
+            
+            const testGroupLinkBtn = document.getElementById('testGroupLinkBtn');
+            if (testGroupLinkBtn) {
+                testGroupLinkBtn.onclick = () => {
+                    const link = document.getElementById('whatsappGroupLink').value;
+                    if (link) window.open(link, '_blank');
+                    else showAlert('No group link set', 'error');
+                };
+            }
+            
+            const chatLinkInput = document.getElementById('whatsappChatLink');
+            if (chatLinkInput) {
+                chatLinkInput.oninput = (e) => {
+                    const preview = document.getElementById('chatPreviewLink');
+                    if (preview) { preview.href = e.target.value || '#'; preview.textContent = e.target.value || 'Not set'; }
+                };
+            }
+            
+            const groupLinkInput = document.getElementById('whatsappGroupLink');
+            if (groupLinkInput) {
+                groupLinkInput.oninput = (e) => {
+                    const preview = document.getElementById('groupPreviewLink');
+                    if (preview) { preview.href = e.target.value || '#'; preview.textContent = e.target.value || 'Not set'; }
+                };
+            }
+            
             const saveCommissionBtn = document.getElementById('saveCommissionBtn');
             if (saveCommissionBtn) {
                 saveCommissionBtn.onclick = async () => {
                     systemSettings.adminCommissionRate = parseFloat(document.getElementById('adminCommissionRate').value) || 3.5;
                     await saveSystemSettings();
                     showAlert(`Admin commission rate set to ${systemSettings.adminCommissionRate}%`, 'success');
+                    renderAdminPanel();
                 };
             }
             
-            // Delete buttons
-            document.getElementById('deleteAllUsersBtn')?.addEventListener('click', deleteAllUsers);
-            document.getElementById('deleteAllDepositsBtn')?.addEventListener('click', deleteAllDepositRequests);
-            document.getElementById('deleteAllWithdrawalsBtn')?.addEventListener('click', deleteAllWithdrawalRequests);
-            document.getElementById('deleteAllDataBtn')?.addEventListener('click', deleteAllData);
+            const depositSearch = document.getElementById('searchDeposits');
+            if (depositSearch) {
+                depositSearch.oninput = (e) => {
+                    sessionStorage.setItem('depositSearch', e.target.value);
+                    renderAdminPanel();
+                };
+            }
             
-            // Deposit actions
-            document.querySelectorAll('.approve-deposit').forEach(btn => {
-                btn.onclick = async () => {
-                    await approveDeposit(btn.dataset.requestId, btn.dataset.userId, parseFloat(btn.dataset.amount), btn.dataset.phone, btn.dataset.network);
+            const withdrawalSearch = document.getElementById('searchWithdrawals');
+            if (withdrawalSearch) {
+                withdrawalSearch.oninput = (e) => {
+                    sessionStorage.setItem('withdrawalSearch', e.target.value);
+                    renderAdminPanel();
                 };
-            });
-            document.querySelectorAll('.reject-deposit').forEach(btn => {
-                btn.onclick = async () => {
-                    await rejectDeposit(btn.dataset.requestId);
-                };
-            });
+            }
             
-            // Withdrawal actions
-            document.querySelectorAll('.approve-withdrawal').forEach(btn => {
-                btn.onclick = async () => {
-                    await approveWithdrawalRequest(btn.dataset.requestId, btn.dataset.userId, parseFloat(btn.dataset.amount), btn.dataset.phone, btn.dataset.network, btn.dataset.txid, parseFloat(btn.dataset.fee), parseFloat(btn.dataset.net));
-                };
-            });
-            document.querySelectorAll('.reject-withdrawal').forEach(btn => {
-                btn.onclick = async () => {
-                    await rejectWithdrawalRequest(btn.dataset.requestId, btn.dataset.userId, parseFloat(btn.dataset.amount), btn.dataset.txid);
-                };
-            });
-            
-            // User actions
-            document.querySelectorAll('.view-user').forEach(btn => {
-                btn.onclick = () => viewUserDetails(btn.dataset.userId);
-            });
-            document.querySelectorAll('.send-warning').forEach(btn => {
-                btn.onclick = () => {
-                    const user = { uid: btn.dataset.userId, username: btn.dataset.username, phone: btn.dataset.phone };
-                    showWarningModal(user);
-                };
-            });
-            document.querySelectorAll('.toggle-lock').forEach(btn => {
-                btn.onclick = async () => {
-                    const userId = btn.dataset.userId;
-                    const currentLock = btn.dataset.locked === 'true';
-                    await toggleUserWithdrawLock(userId, currentLock);
-                };
-            });
-            document.querySelectorAll('.delete-user').forEach(btn => {
-                btn.onclick = async () => {
-                    if (confirm(`⚠️ Delete user "${btn.dataset.username}"?`)) {
-                        await deleteDoc(doc(db, 'users', btn.dataset.userId));
-                        showAlert(`User deleted!`, 'success');
-                        await refreshData();
-                    }
-                };
-            });
-            
-            // Search User
-            const searchUserBtn = document.getElementById('searchUserBtn');
-            const searchUserInput = document.getElementById('searchUserInput');
-            if (searchUserBtn) {
-                searchUserBtn.onclick = async () => {
-                    const searchTerm = searchUserInput.value.trim().toLowerCase();
-                    if (!searchTerm) {
-                        document.getElementById('searchResults').innerHTML = '<div class="alert alert-warning">Enter username or phone to search</div>';
-                        return;
-                    }
-                    const foundUser = allUsers.find(u => 
-                        u.username.toLowerCase().includes(searchTerm) || 
-                        (u.phone && u.phone.includes(searchTerm))
-                    );
-                    if (foundUser) {
-                        document.getElementById('searchResults').innerHTML = `
-                            <div class="search-results">
-                                <div class="flex-between">
-                                    <div>
-                                        <strong>${foundUser.username}</strong><br>
-                                        <span class="small-text">📱 ${foundUser.phone || 'No phone'}</span>
-                                    </div>
-                                    <div>
-                                        <button class="btn btn-warning" id="sendWarningToSearchedUser">⚠️ Send Warning</button>
-                                    </div>
-                                </div>
-                            </div>
-                        `;
-                        document.getElementById('sendWarningToSearchedUser').onclick = () => {
-                            showWarningModal({ uid: foundUser.uid, username: foundUser.username, phone: foundUser.phone });
-                        };
-                    } else {
-                        document.getElementById('searchResults').innerHTML = '<div class="alert alert-error">User not found</div>';
+            const userSearch = document.getElementById('searchUsers');
+            if (userSearch) {
+                userSearch.oninput = (e) => {
+                    const searchTerm = e.target.value.toLowerCase();
+                    const filtered = allUsers.filter(u => u.username.toLowerCase().includes(searchTerm) || (u.phone && u.phone.includes(searchTerm)));
+                    const tbody = document.getElementById('usersTableBody');
+                    if (tbody) {
+                        tbody.innerHTML = filtered.map(user => {
+                            const activeWarnings = (user.warnings || []).filter(w => w.status === 'active' && !w.stopShowing).length;
+                            return `
+                            <tr>
+                                <td><strong>${user.username}</strong></td>
+                                <td>${user.phone || 'N/A'}</td>
+                                <td>${formatMoney(user.deposits || 0)}</td>
+                                <td>${formatMoney(user.earnings || 0)}</td>
+                                <td>${formatMoney(user.withdraws || 0)}</td>
+                                <td>${user.referrals?.length || 0}</td>
+                                <td>${activeWarnings > 0 ? `<span class="warnings-badge">⚠️ ${activeWarnings}</span>` : '0'}</td>
+                                <td><span class="status-badge ${user.withdrawLocked ? 'status-locked' : 'status-active'}">${user.withdrawLocked ? '🔒 Locked' : '✅ Active'}</span></td>
+                                <td>
+                                    <button class="btn btn-primary" onclick="window.viewUserDetails('${user.uid}')">📋 View</button>
+                                    <button class="btn btn-warning" onclick="window.editUserModal('${user.uid}', '${user.username}', '${user.phone || ''}', ${user.deposits || 0}, ${user.earnings || 0}, ${user.withdrawLocked || false}, '${user.password || ''}')">✏️ Edit</button>
+                                    <button class="btn btn-warn" onclick="window.showWarningModal('${user.uid}', '${user.username}', '${user.phone || ''}')">⚠️ Warn</button>
+                                    <button class="btn ${user.withdrawLocked ? 'btn-success' : 'btn-warning'}" onclick="window.toggleWithdrawLock('${user.uid}', ${user.withdrawLocked || false})">${user.withdrawLocked ? '🔓 Unlock' : '🔒 Lock'}</button>
+                                    <button class="btn btn-danger" onclick="window.deleteUserAccount('${user.uid}', '${user.username}')">🗑️ Delete</button>
+                                </td>
+                            </tr>
+                        `}).join('');
                     }
                 };
             }
             
-            // Per-User Warning Controls
-            document.querySelectorAll('.view-user-warnings').forEach(btn => {
-                btn.onclick = () => viewUserDetails(btn.dataset.userId);
-            });
-            document.querySelectorAll('.send-warning-user').forEach(btn => {
-                btn.onclick = () => {
-                    const user = { uid: btn.dataset.userId, username: btn.dataset.username, phone: btn.dataset.phone };
-                    showWarningModal(user);
-                };
-            });
-            document.querySelectorAll('.enable-warnings').forEach(btn => {
-                btn.onclick = async () => {
-                    await toggleUserWarnings(btn.dataset.userId, true);
-                };
-            });
-            document.querySelectorAll('.disable-warnings').forEach(btn => {
-                btn.onclick = async () => {
-                    await toggleUserWarnings(btn.dataset.userId, false);
-                };
-            });
-            
-            // Filter per-user table
-            const filterUsersWarnings = document.getElementById('filterUsersWarnings');
-            if (filterUsersWarnings) {
-                filterUsersWarnings.oninput = (e) => {
-                    const term = e.target.value.toLowerCase();
-                    const rows = document.querySelectorAll('#perUserWarningsTableBody tr');
-                    rows.forEach(row => {
-                        const text = row.textContent.toLowerCase();
-                        row.style.display = text.includes(term) ? '' : 'none';
-                    });
-                };
-            }
-            
-            // Warnings History Filters
-            const applyHistoryFilters = document.getElementById('applyHistoryFilters');
-            if (applyHistoryFilters) {
-                applyHistoryFilters.onclick = () => {
-                    const userFilter = document.getElementById('historyUserFilter').value;
-                    const statusFilter = document.getElementById('historyStatusFilter').value;
-                    const searchTerm = document.getElementById('historySearchInput').value.toLowerCase();
-                    
-                    let filtered = allWarningsList;
-                    if (userFilter) filtered = filtered.filter(w => w.userId === userFilter);
-                    if (statusFilter === 'active') filtered = filtered.filter(w => w.status === 'active' && !w.stopShowing);
-                    if (statusFilter === 'resolved') filtered = filtered.filter(w => w.status === 'resolved');
-                    if (statusFilter === 'stopped') filtered = filtered.filter(w => w.stopShowing === true);
-                    if (searchTerm) filtered = filtered.filter(w => w.subject.toLowerCase().includes(searchTerm));
-                    
-                    const tbody = document.getElementById('warningsHistoryBody');
-                    tbody.innerHTML = filtered.slice(0, 100).map(w => `
-                        <tr>
-                            <td><strong>${w.username}</strong><br><span class="small-text">${w.userPhone || ''}</span></td>
-                            <td>${w.subject}</td>
-                            <td><span class="warning-type ${w.type === 'warning' ? 'warning-type-warning' : 'warning-type-critical'}">${w.type}</span></td>
-                            <td>${new Date(w.sentAtTimestamp).toLocaleString()}</td>
-                            <td>
-                                ${w.status === 'active' && !w.stopShowing ? '<span class="warning-status-badge active">🟡 Active</span>' : ''}
-                                ${w.status === 'resolved' ? '<span class="warning-status-badge resolved">✅ Resolved</span>' : ''}
-                                ${w.stopShowing === true ? '<span class="warning-status-badge stopped">⛔ Stopped</span>' : ''}
-                            </td>
-                            <td class="warning-actions">
-                                ${w.status === 'active' && !w.stopShowing ? `<button class="btn btn-sm btn-success resolve-warning-history" data-user-id="${w.userId}" data-warning-id="${w.id}">Resolve</button>` : ''}
-                                ${w.status === 'active' && !w.stopShowing ? `<button class="btn btn-sm btn-warning stop-warning-history" data-user-id="${w.userId}" data-warning-id="${w.id}">Stop</button>` : ''}
-                                <button class="btn btn-sm btn-danger delete-warning-history" data-user-id="${w.userId}" data-warning-id="${w.id}">Delete</button>
-                            </td>
-                        </tr>
-                    `).join('');
-                    
-                    // Attach events to new buttons
-                    document.querySelectorAll('.resolve-warning-history').forEach(btn => {
-                        btn.onclick = async () => {
-                            await resolveWarning(btn.dataset.userId, btn.dataset.warningId);
-                            await refreshData();
-                        };
-                    });
-                    document.querySelectorAll('.stop-warning-history').forEach(btn => {
-                        btn.onclick = async () => {
-                            await stopShowingWarning(btn.dataset.userId, btn.dataset.warningId);
-                            await refreshData();
-                        };
-                    });
-                    document.querySelectorAll('.delete-warning-history').forEach(btn => {
-                        btn.onclick = async () => {
-                            await deleteWarning(btn.dataset.userId, btn.dataset.warningId);
-                            await refreshData();
-                        };
-                    });
-                };
-            }
-            
-            // Initial warning history buttons
-            document.querySelectorAll('.resolve-warning').forEach(btn => {
-                btn.onclick = async () => {
-                    await resolveWarning(btn.dataset.userId, btn.dataset.warningId);
-                    await refreshData();
-                };
-            });
-            document.querySelectorAll('.stop-warning').forEach(btn => {
-                btn.onclick = async () => {
-                    await stopShowingWarning(btn.dataset.userId, btn.dataset.warningId);
-                    await refreshData();
-                };
-            });
-            document.querySelectorAll('.delete-warning').forEach(btn => {
-                btn.onclick = async () => {
-                    await deleteWarning(btn.dataset.userId, btn.dataset.warningId);
-                    await refreshData();
-                };
-            });
-            
-            // Deposit/Withdrawal search
-            const searchDeposits = document.getElementById('searchDeposits');
-            if (searchDeposits) {
-                searchDeposits.oninput = (e) => {
-                    const term = e.target.value.toLowerCase();
-                    const rows = document.querySelectorAll('#depositsTableBody tr');
-                    rows.forEach(row => {
-                        row.style.display = row.textContent.toLowerCase().includes(term) ? '' : 'none';
-                    });
-                };
-            }
-            const searchWithdrawals = document.getElementById('searchWithdrawals');
-            if (searchWithdrawals) {
-                searchWithdrawals.oninput = (e) => {
-                    const term = e.target.value.toLowerCase();
-                    const rows = document.querySelectorAll('#withdrawalsTableBody tr');
-                    rows.forEach(row => {
-                        row.style.display = row.textContent.toLowerCase().includes(term) ? '' : 'none';
-                    });
-                };
-            }
-            const searchUsers = document.getElementById('searchUsers');
-            if (searchUsers) {
-                searchUsers.oninput = (e) => {
-                    const term = e.target.value.toLowerCase();
-                    const rows = document.querySelectorAll('#usersTableBody tr');
-                    rows.forEach(row => {
-                        row.style.display = row.textContent.toLowerCase().includes(term) ? '' : 'none';
-                    });
+            const saveSettings = document.getElementById('saveSettingsBtn');
+            if (saveSettings) {
+                saveSettings.onclick = async () => {
+                    systemSettings.minDeposit = parseInt(document.getElementById('minDeposit').value) || 10000;
+                    systemSettings.minWithdraw = parseInt(document.getElementById('minWithdraw').value) || 5000;
+                    systemSettings.withdrawFee = parseInt(document.getElementById('withdrawFee').value) || 10;
+                    systemSettings.dailyProfit = parseInt(document.getElementById('dailyProfit').value) || 10;
+                    await saveSystemSettings();
+                    showAlert('System settings saved!', 'success');
                 };
             }
         }
         
-        async function viewUserDetails(userId) {
+        async function getUserReferralsWithInvestment(userId) {
+            try {
+                const userRef = doc(db, 'users', userId);
+                const userSnap = await getDoc(userRef);
+                if (!userSnap.exists()) return [];
+                
+                const referrals = userSnap.data().referrals || [];
+                const referralsWithInvestment = await Promise.all(referrals.map(async (ref) => {
+                    const refUserRef = doc(db, 'users', ref.userId);
+                    const refUserSnap = await getDoc(refUserRef);
+                    const invested = refUserSnap.exists() ? (refUserSnap.data().deposits || 0) : 0;
+                    return {
+                        ...ref,
+                        invested: invested
+                    };
+                }));
+                return referralsWithInvestment;
+            } catch (error) {
+                console.error('Error getting referrals:', error);
+                return [];
+            }
+        }
+        
+        window.viewUserDetails = async (userId) => {
             const user = allUsers.find(u => u.uid === userId);
             if (!user) return;
             
+            const referralsWithInvestment = await getUserReferralsWithInvestment(userId);
+            const totalTeamInvestment = referralsWithInvestment.reduce((sum, ref) => sum + ref.invested, 0);
+            const commission = totalTeamInvestment * 0.1;
             const warnings = user.warnings || [];
             const activeWarnings = warnings.filter(w => w.status === 'active' && !w.stopShowing);
+            const stoppedWarnings = warnings.filter(w => w.stopShowing === true);
+            const resolvedWarnings = warnings.filter(w => w.status === 'resolved');
             
             const modal = document.createElement('div');
             modal.className = 'modal';
@@ -2019,72 +2027,192 @@ Your account has been flagged for suspicious activity. Please contact support wi
                     <h3>📋 User Details: ${user.username}</h3>
                     <p><strong>Phone:</strong> ${user.phone || 'Not set'}</p>
                     <p><strong>Country:</strong> ${user.country || 'Uganda'}</p>
+                    <p><strong>Password:</strong> ${user.password || 'Not stored'}</p>
                     <p><strong>Referred By:</strong> ${user.referredBy || 'None'}</p>
                     <p><strong>Deposits:</strong> ${formatMoney(user.deposits || 0)}</p>
                     <p><strong>Earnings:</strong> ${formatMoney(user.earnings || 0)}</p>
                     <p><strong>Withdrawals:</strong> ${formatMoney(user.withdraws || 0)}</p>
-                    <p><strong>Warnings Enabled:</strong> ${user.warningsEnabled !== false ? '🟢 YES' : '🔴 NO'}</p>
+                    <p><strong>Active Deposits:</strong> ${user.activeDeposits?.length || 0}</p>
+                    <p><strong>Referrals Count:</strong> ${user.referrals?.length || 0}</p>
+                    
                     ${activeWarnings.length > 0 ? `
-                        <p><strong>⚠️ Active Warnings (${activeWarnings.length}):</strong></p>
+                        <p><strong>⚠️ ACTIVE WARNINGS (${activeWarnings.length}):</strong></p>
                         <div class="referral-list-modal">
                             ${activeWarnings.map(w => `
                                 <div class="referral-item-modal">
                                     <span>📢 ${w.subject}</span>
                                     <span class="small-text">${new Date(w.sentAtTimestamp).toLocaleDateString()}</span>
                                     <div style="display: flex; gap: 5px;">
-                                        <button class="btn btn-success btn-sm resolve-warning-detail" data-warning-id="${w.id}">Resolve</button>
-                                        <button class="btn btn-warning btn-sm stop-warning-detail" data-warning-id="${w.id}">Stop</button>
-                                        <button class="btn btn-danger btn-sm delete-warning-detail" data-warning-id="${w.id}">Delete</button>
+                                        <button class="btn btn-success btn-sm" onclick="window.resolveWarning('${userId}', '${w.id}')">✅ Resolve</button>
+                                        <button class="btn btn-warning btn-sm" onclick="window.stopShowingWarning('${userId}', '${w.id}')">⛔ Stop</button>
+                                        <button class="btn btn-danger btn-sm" onclick="window.deleteWarning('${userId}', '${w.id}')">🗑️ Delete</button>
                                     </div>
                                 </div>
                             `).join('')}
                         </div>
-                    ` : '<p><strong>⚠️ Warnings:</strong> No active warnings</p>'}
+                    ` : '<p><strong>⚠️ Active Warnings:</strong> None</p>'}
+                    
+                    ${stoppedWarnings.length > 0 ? `
+                        <p><strong>⛔ STOPPED WARNINGS (${stoppedWarnings.length}):</strong></p>
+                        <div class="referral-list-modal">
+                            ${stoppedWarnings.map(w => `
+                                <div class="referral-item-modal">
+                                    <span>📢 ${w.subject}</span>
+                                    <span class="small-text">${new Date(w.sentAtTimestamp).toLocaleDateString()}</span>
+                                    <button class="btn btn-success btn-sm" onclick="window.resolveWarning('${userId}', '${w.id}')">✅ Resolve</button>
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : ''}
+                    
+                    ${resolvedWarnings.length > 0 ? `
+                        <p><strong>✅ RESOLVED WARNINGS (${resolvedWarnings.length}):</strong></p>
+                        <div class="referral-list-modal">
+                            ${resolvedWarnings.map(w => `
+                                <div class="referral-item-modal">
+                                    <span>📢 ${w.subject}</span>
+                                    <span class="small-text">${new Date(w.sentAtTimestamp).toLocaleDateString()}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : ''}
+                    
+                    ${referralsWithInvestment.length > 0 ? `
+                        <p><strong>👥 Referrals List:</strong></p>
+                        <div class="referral-list-modal">
+                            ${referralsWithInvestment.map(ref => `
+                                <div class="referral-item-modal">
+                                    <span>👤 ${ref.username}</span>
+                                    <span>💰 ${formatMoney(ref.invested)}</span>
+                                    <span class="small-text">Joined: ${new Date(ref.joinedAt).toLocaleDateString()}</span>
+                                </div>
+                            `).join('')}
+                            <div class="referral-item-modal" style="border-top: 1px solid #FFB347; margin-top: 5px; padding-top: 8px;">
+                                <strong>💰 Total Team Investment:</strong>
+                                <strong style="color: #FFB347;">${formatMoney(totalTeamInvestment)}</strong>
+                            </div>
+                            <div class="referral-item-modal">
+                                <strong>🎯 Your 10% Commission:</strong>
+                                <strong style="color: #10B981;">${formatMoney(commission)}</strong>
+                            </div>
+                        </div>
+                    ` : '<p><strong>👥 Referrals:</strong> None</p>'}
+                    <p><strong>Status:</strong> ${user.withdrawLocked ? '🔒 Withdraw Locked' : '✅ Active'}</p>
+                    <div style="display: flex; gap: 10px; margin-top: 16px;"><button class="btn btn-primary" id="closeModal">Close</button></div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            document.getElementById('closeModal').onclick = () => modal.remove();
+        };
+        
+        window.resolveWarning = async (userId, warningId) => {
+            await resolveWarning(userId, warningId);
+        };
+        
+        window.stopShowingWarning = async (userId, warningId) => {
+            await stopShowingWarning(userId, warningId);
+        };
+        
+        window.deleteWarning = async (userId, warningId) => {
+            await deleteWarning(userId, warningId);
+        };
+        
+        window.showWarningModal = (userId, username, phone) => {
+            const user = { uid: userId, username, phone };
+            showWarningModal(user);
+        };
+        
+        window.editUserModal = async (userId, username, currentPhone, currentDeposits, currentEarnings, currentLock, currentPassword) => {
+            const user = allUsers.find(u => u.uid === userId);
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.style.display = 'flex';
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <h3>✏️ Edit User: ${username}</h3>
+                    <div class="form-group">
+                        <label>📱 Phone Number (07XXXXXXXX)</label>
+                        <input type="tel" id="editPhone" class="edit-input" value="${currentPhone}" placeholder="07XXXXXXXX">
+                    </div>
+                    <div class="form-group password-field">
+                        <label>🔐 Current Password</label>
+                        <input type="password" id="editCurrentPassword" class="edit-input" value="${currentPassword || ''}" readonly disabled>
+                        <button type="button" class="password-toggle" onclick="togglePasswordVisibility('editCurrentPassword')">👁️ Show</button>
+                    </div>
+                    <div class="form-group">
+                        <label>🔒 New Password (leave blank to keep current)</label>
+                        <input type="password" id="editNewPassword" class="edit-input" placeholder="New password (min 6 chars)">
+                    </div>
+                    <div class="form-group">
+                        <label>💰 Deposits Balance</label>
+                        <input type="number" id="editDeposits" class="edit-input" value="${currentDeposits}">
+                    </div>
+                    <div class="form-group">
+                        <label>📈 Earnings Balance</label>
+                        <input type="number" id="editEarnings" class="edit-input" value="${currentEarnings}">
+                    </div>
+                    <div class="toggle-group">
+                        <label>🔐 Withdraw Lock</label>
+                        <label class="switch">
+                            <input type="checkbox" id="editWithdrawLock" ${currentLock ? 'checked' : ''}>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>👥 Referred By (username)</label>
+                        <input type="text" id="editReferredBy" class="edit-input" value="${user?.referredBy || ''}" placeholder="Leave empty for none">
+                    </div>
                     <div style="display: flex; gap: 10px; margin-top: 16px;">
-                        <button class="btn btn-primary" id="closeModal">Close</button>
-                        <button class="btn btn-warning" id="sendWarningFromDetail">⚠️ Send Warning</button>
+                        <button class="btn btn-success" id="saveEditBtn">Save Changes</button>
+                        <button class="btn btn-secondary" id="cancelEditBtn">Cancel</button>
                     </div>
                 </div>
             `;
             document.body.appendChild(modal);
             
-            document.getElementById('closeModal').onclick = () => modal.remove();
-            document.getElementById('sendWarningFromDetail').onclick = () => {
-                modal.remove();
-                showWarningModal({ uid: user.uid, username: user.username, phone: user.phone });
+            window.togglePasswordVisibility = (fieldId) => {
+                const field = document.getElementById(fieldId);
+                if (field.type === 'password') {
+                    field.type = 'text';
+                } else {
+                    field.type = 'password';
+                }
             };
             
-            document.querySelectorAll('.resolve-warning-detail').forEach(btn => {
-                btn.onclick = async () => {
-                    await resolveWarning(user.uid, btn.dataset.warningId);
-                    modal.remove();
-                    await refreshData();
-                };
-            });
-            document.querySelectorAll('.stop-warning-detail').forEach(btn => {
-                btn.onclick = async () => {
-                    await stopShowingWarning(user.uid, btn.dataset.warningId);
-                    modal.remove();
-                    await refreshData();
-                };
-            });
-            document.querySelectorAll('.delete-warning-detail').forEach(btn => {
-                btn.onclick = async () => {
-                    await deleteWarning(user.uid, btn.dataset.warningId);
-                    modal.remove();
-                    await refreshData();
-                };
-            });
-        }
+            document.getElementById('saveEditBtn').onclick = async () => {
+                const phone = document.getElementById('editPhone').value;
+                const newPassword = document.getElementById('editNewPassword').value;
+                const deposits = parseInt(document.getElementById('editDeposits').value) || 0;
+                const earnings = parseInt(document.getElementById('editEarnings').value) || 0;
+                const withdrawLocked = document.getElementById('editWithdrawLock').checked;
+                const referredBy = document.getElementById('editReferredBy')?.value || null;
+                
+                if (phone && !/^07\d{8}$/.test(phone)) {
+                    showAlert('Phone must start with 07 and be 10 digits', 'error');
+                    return;
+                }
+                
+                const updates = { phone, deposits, earnings, withdrawLocked };
+                if (referredBy !== undefined) updates.referredBy = referredBy || null;
+                if (newPassword && newPassword.length >= 6) {
+                    updates.newPassword = newPassword;
+                }
+                
+                await editUser(userId, updates);
+                modal.remove();
+            };
+            document.getElementById('cancelEditBtn').onclick = () => modal.remove();
+        };
         
-        async function toggleUserWithdrawLock(userId, currentLock) {
-            await updateDoc(doc(db, 'users', userId), { withdrawLocked: !currentLock });
-            showAlert(`Withdraw lock ${!currentLock ? 'ENABLED' : 'DISABLED'}`, 'success');
-            await refreshData();
-        }
+        window.toggleWithdrawLock = async (userId, currentLock) => { await toggleUserWithdrawLock(userId, currentLock); };
+        window.deleteUserAccount = async (userId, username) => { await deleteUser(userId, username); };
+        window.approveDeposit = async (requestId, userId, amount, phoneNumber, network) => { await approveDeposit(requestId, userId, amount, phoneNumber, network); };
+        window.rejectDeposit = async (requestId) => { await rejectDeposit(requestId); };
+        window.approveWithdrawalRequest = async (requestId, userId, amount, phoneNumber, network, transactionId, fee, netAmount) => { await approveWithdrawalRequest(requestId, userId, amount, phoneNumber, network, transactionId, fee, netAmount); };
+        window.rejectWithdrawalRequest = async (requestId, userId, amount, transactionId) => { await rejectWithdrawalRequest(requestId, userId, amount, transactionId); };
         
         async function deleteAllUsers() {
-            if (confirm('⚠️ Delete ALL users?')) {
+            if (confirm('⚠️ Are you sure you want to delete ALL users? This action cannot be undone!')) {
                 const batch = writeBatch(db);
                 const usersSnapshot = await getDocs(collection(db, 'users'));
                 usersSnapshot.forEach(doc => batch.delete(doc.ref));
@@ -2095,7 +2223,7 @@ Your account has been flagged for suspicious activity. Please contact support wi
         }
         
         async function deleteAllDepositRequests() {
-            if (confirm('⚠️ Delete ALL deposit requests?')) {
+            if (confirm('⚠️ Delete ALL deposit requests? This action cannot be undone!')) {
                 const batch = writeBatch(db);
                 const depositsSnapshot = await getDocs(collection(db, 'depositRequests'));
                 depositsSnapshot.forEach(doc => batch.delete(doc.ref));
@@ -2106,7 +2234,7 @@ Your account has been flagged for suspicious activity. Please contact support wi
         }
         
         async function deleteAllWithdrawalRequests() {
-            if (confirm('⚠️ Delete ALL withdrawal requests?')) {
+            if (confirm('⚠️ Delete ALL withdrawal requests? This action cannot be undone!')) {
                 const batch = writeBatch(db);
                 const withdrawalsSnapshot = await getDocs(collection(db, 'withdrawalRequests'));
                 withdrawalsSnapshot.forEach(doc => batch.delete(doc.ref));
@@ -2117,7 +2245,7 @@ Your account has been flagged for suspicious activity. Please contact support wi
         }
         
         async function deleteAllData() {
-            const confirmText = prompt('⚠️ Type "DELETE" to confirm deletion of ALL data:');
+            const confirmText = prompt('⚠️ DANGER: This will delete EVERYTHING (users, deposits, withdrawals). Type "DELETE" to confirm:');
             if (confirmText === 'DELETE') {
                 const batch = writeBatch(db);
                 const usersSnapshot = await getDocs(collection(db, 'users'));
@@ -2129,6 +2257,8 @@ Your account has been flagged for suspicious activity. Please contact support wi
                 await batch.commit();
                 showAlert('ALL DATA DELETED!', 'warning');
                 await refreshData();
+            } else {
+                showAlert('Deletion cancelled', 'error');
             }
         }
         

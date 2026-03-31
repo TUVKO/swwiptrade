@@ -1133,7 +1133,6 @@
             if (warning.status !== 'active') return;
             if (warning.stopShowing === true) return;
             if (systemSettings.warningsEnabled === false) return;
-            if (userData && userData.warningsEnabled === false) return;
             
             const typeLabels = {
                 warning: '⚠️ IMPORTANT NOTICE',
@@ -1164,6 +1163,7 @@
                 await acknowledgeWarning(warning.id);
                 modal.remove();
                 warningModalShown = false;
+                // Check for more warnings after dismissing
                 setTimeout(() => {
                     checkAndShowWarnings();
                 }, 500);
@@ -1209,12 +1209,9 @@
                 console.log('Warnings globally disabled');
                 return;
             }
-            if (userData.warningsEnabled === false) {
-                console.log('Warnings disabled for this user');
-                return;
-            }
             
             const warnings = userData.warnings || [];
+            // Show warnings that are ACTIVE, NOT stopped, and (either not acknowledged OR we want to show again)
             const activeWarnings = warnings.filter(w => w.status === 'active' && !w.stopShowing);
             
             console.log('Checking warnings:', activeWarnings.length, 'active warnings found');
@@ -2130,7 +2127,6 @@
                         referrals: [],
                         referralEarnings: { level1: 0, level2: 0, level3: 0 },
                         warnings: [],
-                        warningsEnabled: true,
                         createdAt: serverTimestamp()
                     };
                     
@@ -2410,7 +2406,7 @@
                         </div>
                         <div class="table-wrapper">
                             <table class="investment-table">
-                                <thead>  <tr><th>Level</th><th>Commission</th><th>Earned</th>  </tr> </thead>
+                                <thead> <tr><th>Level</th><th>Commission</th><th>Earned</th> </tr> </thead>
                                 <tbody>
                                     <tr><td>Level 1</td><td>10%</td><td>${formatMoney(userData?.referralEarnings?.level1 || 0)}</td></tr>
                                     <tr><td>Level 2</td><td>4%</td><td>${formatMoney(userData?.referralEarnings?.level2 || 0)}</td></tr>
