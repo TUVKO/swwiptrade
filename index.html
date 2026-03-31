@@ -619,6 +619,8 @@
         .transaction-card.earning { border-left-color: #FFB347; }
         .transaction-card.referral { border-left-color: #8B5CF6; }
         .transaction-card.bonus { border-left-color: #06B6D4; }
+        .transaction-card.balance_adjustment { border-left-color: #F59E0B; }
+        .transaction-card.goaj_deduction { border-left-color: #DC2626; }
         
         .transaction-header {
             display: flex;
@@ -852,7 +854,6 @@
             margin-top: 4px;
         }
         
-        /* Warning Modal Styles - Full Screen */
         .warning-fullscreen-modal {
             position: fixed;
             top: 0;
@@ -879,17 +880,9 @@
             animation: popIn 0.3s ease;
         }
         
-        .warning-modal-content.warning {
-            border-color: #F59E0B;
-        }
-        
-        .warning-modal-content.suspension {
-            border-color: #DC2626;
-        }
-        
-        .warning-modal-content.restriction {
-            border-color: #8B5CF6;
-        }
+        .warning-modal-content.warning { border-color: #F59E0B; }
+        .warning-modal-content.suspension { border-color: #DC2626; }
+        .warning-modal-content.restriction { border-color: #8B5CF6; }
         
         .warning-icon {
             font-size: 72px;
@@ -938,11 +931,6 @@
             cursor: pointer;
             width: 100%;
             transition: all 0.2s;
-        }
-        
-        .warning-acknowledge-btn:hover {
-            background: #D97706;
-            transform: scale(1.02);
         }
         
         @keyframes fadeIn {
@@ -1127,7 +1115,6 @@
             }
         }
         
-        // ========== WARNING SYSTEM FUNCTIONS ==========
         function showWarningModal(warning) {
             if (warningModalShown) return;
             if (warning.status !== 'active') return;
@@ -1163,7 +1150,6 @@
                 await acknowledgeWarning(warning.id);
                 modal.remove();
                 warningModalShown = false;
-                // Check for more warnings after dismissing
                 setTimeout(() => {
                     checkAndShowWarnings();
                 }, 500);
@@ -1205,19 +1191,12 @@
         
         function checkAndShowWarnings() {
             if (!userData) return;
-            if (systemSettings.warningsEnabled === false) {
-                console.log('Warnings globally disabled');
-                return;
-            }
+            if (systemSettings.warningsEnabled === false) return;
             
             const warnings = userData.warnings || [];
-            // Show warnings that are ACTIVE, NOT stopped, and (either not acknowledged OR we want to show again)
             const activeWarnings = warnings.filter(w => w.status === 'active' && !w.stopShowing);
             
-            console.log('Checking warnings:', activeWarnings.length, 'active warnings found');
-            
             if (activeWarnings.length > 0 && !warningModalShown) {
-                console.log('Showing warning modal for:', activeWarnings[0].subject);
                 showWarningModal(activeWarnings[0]);
             }
         }
@@ -1235,8 +1214,6 @@
             });
             
             if (oldTransactions.length > 0) {
-                console.log(`🗑️ Deleting ${oldTransactions.length} old transactions`);
-                
                 const updatedTransactions = transactions.filter(t => {
                     const timestamp = t.timestamp || new Date(t.date).getTime();
                     return timestamp >= cutoffTime;
@@ -1548,7 +1525,9 @@
                 'withdraw': 'WD',
                 'earning': 'ER',
                 'referral': 'RF',
-                'bonus': 'BN'
+                'bonus': 'BN',
+                'balance_adjustment': 'ADJ',
+                'goaj_deduction': 'GJ'
             }[type] || 'TX';
             const seq = String(sequence).padStart(3, '0');
             return `${typeCode}-${year}${month}${day}-${seq}`;
@@ -1624,8 +1603,12 @@
                 const currentTransactions = userDataToProcess.transactions || [];
                 const allTransactions = [...earningsTransactions, ...currentTransactions];
                 
+                // Add earnings to user's balance (works with negative numbers)
+                const currentEarnings = userDataToProcess.earnings || 0;
+                const newEarnings = currentEarnings + totalEarnings;
+                
                 await updateDoc(doc(db, 'users', uid), {
-                    earnings: increment(totalEarnings),
+                    earnings: newEarnings,
                     activeDeposits: updatedDeposits,
                     transactions: allTransactions
                 });
@@ -1843,16 +1826,24 @@
             }
         }
         
+        // ========== MODIFIED WITHDRAW FUNCTION WITH EARNINGS CHECK ==========
         async function withdraw(amount, phoneNumber, network) {
+            // Check if earnings are zero or negative (overdraft)
+            const currentEarnings = userData?.earnings || 0;
+            if (currentEarnings <= 0) {
+                showSweetError('Insufficient Balance', `You cannot withdraw because your earnings balance is ${formatMoney(currentEarnings)}.`);
+                return false;
+            }
+            
             if (systemSettings.withdrawLocked === true) {
-                showSweetError('Insufficient Balance', `You need ${formatMoney(amount)} to withdraw<br>Your available earnings: ${formatMoney(userData?.earnings || 0)}`);
+                showSweetError('Withdrawals Locked', 'Withdrawals are currently disabled. Please try again later.');
                 return false;
             }
             
             const settingsRef = doc(db, 'admin', 'settings');
             const settingsSnap = await getDoc(settingsRef);
             if (settingsSnap.exists() && settingsSnap.data().withdrawLocked === true) {
-                showSweetError('Insufficient Balance', `You need ${formatMoney(amount)} to withdraw<br>Your available earnings: ${formatMoney(userData?.earnings || 0)}`);
+                showSweetError('Withdrawals Locked', 'Withdrawals are currently disabled. Please try again later.');
                 return false;
             }
             
@@ -2174,6 +2165,8 @@
         function renderDashboard() {
             updateTradingPrices();
             const showWhatsappGroupBtn = whatsappGroupLink && whatsappGroupLink.trim() !== "";
+            const currentEarnings = userData?.earnings || 0;
+            const earningsDisplay = formatMoney(currentEarnings);
             
             document.getElementById('app').innerHTML = `
                 <div class="container">
@@ -2204,11 +2197,11 @@
                     
                     <div class="card">
                         <div class="stat-label">Available Earnings</div>
-                        <div style="font-size: 24px; font-weight: bold; color: #FFD966;">${formatMoney(userData?.earnings || 0)}</div>
+                        <div style="font-size: 24px; font-weight: bold; color: ${currentEarnings < 0 ? '#EF4444' : '#FFD966'};">${earningsDisplay}</div>
                     </div>
                     <div class="stats-row">
                         <div class="stat-box"><div class="label">Deposits</div><div class="value">${formatMoney(userData?.deposits || 0)}</div></div>
-                        <div class="stat-box"><div class="label">Earnings</div><div class="value">${formatMoney(userData?.earnings || 0)}</div></div>
+                        <div class="stat-box"><div class="label">Earnings</div><div class="value">${earningsDisplay}</div></div>
                         <div class="stat-box"><div class="label">Withdraws</div><div class="value">${formatMoney(userData?.withdraws || 0)}</div></div>
                     </div>
                     <div class="referral-box">
@@ -2263,14 +2256,14 @@
                                 </thead>
                                 <tbody>
                                     ${INVESTMENT_PLANS.map(p => `
-                                            <tr>
-                                                <td style="font-weight: bold;">${formatMoney(p.amount)}</td>
-                                                <td style="color: #FFB347;">${formatMoney(p.daily)}</td>
-                                                <td style="color: #10B981;">${formatMoney(p.total)}</td>
-                                            </tr>
+                                        <tr>
+                                            <td style="font-weight: bold;">${formatMoney(p.amount)}</td>
+                                            <td style="color: #FFB347;">${formatMoney(p.daily)}</td>
+                                            <td style="color: #10B981;">${formatMoney(p.total)}</td>
+                                         </tr>
                                     `).join('')}
                                 </tbody>
-                            </table>
+                             </table>
                         </div>
                         <div class="action-grid mt-2">
                             <button class="btn btn-secondary" id="closeTable">Close</button>
@@ -2295,6 +2288,7 @@
             const withdrawals = transactions.filter(t => t.type === 'withdraw');
             const earnings = transactions.filter(t => t.type === 'earning');
             const referrals = transactions.filter(t => t.type === 'referral');
+            const adjustments = transactions.filter(t => t.type === 'balance_adjustment' || t.type === 'goaj_deduction');
             
             const getStatusClass = (status) => {
                 if (status === 'completed') return 'status-completed';
@@ -2318,8 +2312,9 @@
                             <span class="transaction-type-icon">${icon}</span>
                             <span class="transaction-id">${t.transactionId || 'TX-' + t.id}</span>
                         </div>
-                        <div class="transaction-amount">${type === 'withdraw' ? '-' : '+'} ${formatMoney(t.amount)}</div>
-                        ${t.fee ? `<div class="small-text">Fee: -${formatMoney(t.fee)} | Net: ${formatMoney(t.netAmount)}</div>` : ''}
+                        <div class="transaction-amount">${t.amount < 0 ? '-' : '+'} ${formatMoney(Math.abs(t.amount))}</div>
+                        ${t.description ? `<div class="small-text">${t.description}</div>` : ''}
+                        ${t.previousBalance !== undefined ? `<div class="small-text">Previous: ${formatMoney(t.previousBalance)} → New: ${formatMoney(t.newBalance)}</div>` : ''}
                         <div class="transaction-details">
                             <span class="transaction-date">${formatDateTime(t.timestamp || new Date(t.date).getTime())}</span>
                             <span class="transaction-status ${getStatusClass(t.status)}">${getStatusText(t.status)}</span>
@@ -2337,12 +2332,14 @@
                             <button class="tab-btn ${currentTransactionTab === 'withdrawals' ? 'active' : ''}" data-tab="withdrawals">💸 Withdrawals</button>
                             <button class="tab-btn ${currentTransactionTab === 'earnings' ? 'active' : ''}" data-tab="earnings">📈 Earnings</button>
                             <button class="tab-btn ${currentTransactionTab === 'referrals' ? 'active' : ''}" data-tab="referrals">👥 Referrals</button>
+                            <button class="tab-btn ${currentTransactionTab === 'adjustments' ? 'active' : ''}" data-tab="adjustments">⚖️ Adjustments</button>
                         </div>
                         <div id="transactionsContent">
                             ${currentTransactionTab === 'deposits' ? renderTransactionList(deposits, 'deposit', '💰') : ''}
                             ${currentTransactionTab === 'withdrawals' ? renderTransactionList(withdrawals, 'withdraw', '💸') : ''}
                             ${currentTransactionTab === 'earnings' ? renderTransactionList(earnings, 'earning', '📈') : ''}
                             ${currentTransactionTab === 'referrals' ? renderTransactionList(referrals, 'referral', '👥') : ''}
+                            ${currentTransactionTab === 'adjustments' ? renderTransactionList(adjustments, 'balance_adjustment', '⚖️') : ''}
                         </div>
                     </div>
                 </div>
@@ -2406,7 +2403,7 @@
                         </div>
                         <div class="table-wrapper">
                             <table class="investment-table">
-                                <thead> <tr><th>Level</th><th>Commission</th><th>Earned</th> </tr> </thead>
+                                <thead>  <th>Level</th><th>Commission</th><th>Earned</th> </thead>
                                 <tbody>
                                     <tr><td>Level 1</td><td>10%</td><td>${formatMoney(userData?.referralEarnings?.level1 || 0)}</td></tr>
                                     <tr><td>Level 2</td><td>4%</td><td>${formatMoney(userData?.referralEarnings?.level2 || 0)}</td></tr>
@@ -2529,17 +2526,22 @@
             checkAndShowWarnings();
         }
         
+        // ========== MODIFIED RENDER WITHDRAW WITH EARNINGS CHECK ==========
         function renderWithdraw() {
             const hasDeposit = hasMadeDeposit();
+            const currentEarnings = userData?.earnings || 0;
+            const canWithdraw = hasDeposit && currentEarnings > 0;
             const warningMsg = !hasDeposit ? '<div class="alert alert-error" style="margin-bottom: 12px;">⚠️ You must make a deposit first before you can withdraw. Registration and referral bonuses cannot be withdrawn without an active investment.</div>' : '';
+            const negativeWarning = currentEarnings <= 0 ? '<div class="alert alert-error" style="margin-bottom: 12px;">⚠️ Your earnings balance is ${formatMoney(currentEarnings)}. You cannot withdraw until your balance becomes positive.</div>' : '';
             
             document.getElementById('app').innerHTML = `
                 <div class="container">
                     ${renderHeaderWithLogo(true, true)}
                     <div class="card">
                         ${warningMsg}
+                        ${currentEarnings <= 0 ? negativeWarning : ''}
                         <div class="stat-label">Available Earnings</div>
-                        <div style="font-size: 24px; font-weight: bold;">${formatMoney(userData?.earnings || 0)}</div>
+                        <div style="font-size: 24px; font-weight: bold; color: ${currentEarnings < 0 ? '#EF4444' : '#FFD966'};">${formatMoney(currentEarnings)}</div>
                         <div class="small-text mb-1 mt-2">Min: 5,000 UGX | Fee: 10%</div>
                         <div class="fee-breakdown" id="feePreview" style="display: none;">
                             <div class="fee-row"><span>Requested:</span><span>0 UGX</span></div>
@@ -2550,10 +2552,10 @@
                             <div class="network-option ${selectedNetwork === 'MTN' ? 'selected' : ''}" data-network="MTN">📱 MTN</div>
                             <div class="network-option ${selectedNetwork === 'Airtel' ? 'selected' : ''}" data-network="Airtel">📱 Airtel</div>
                         </div>
-                        <input type="number" id="withdrawAmount" placeholder="Enter amount" ${!hasDeposit ? 'disabled' : ''} oninput="window.updateFeePreview(this.value)">
-                        <input type="tel" id="withdrawPhone" placeholder="Mobile Money Number (07XXXXXXXX)" ${!hasDeposit ? 'disabled' : ''} value="${userData?.phone || ''}">
+                        <input type="number" id="withdrawAmount" placeholder="Enter amount" ${!canWithdraw ? 'disabled' : ''} oninput="window.updateFeePreview(this.value)">
+                        <input type="tel" id="withdrawPhone" placeholder="Mobile Money Number (07XXXXXXXX)" ${!canWithdraw ? 'disabled' : ''} value="${userData?.phone || ''}">
                         <div class="small-text mb-1">Enter the phone number to receive payment</div>
-                        <button class="btn btn-danger" id="submitWithdraw" ${!hasDeposit ? 'disabled' : ''}>Request Withdrawal</button>
+                        <button class="btn btn-danger" id="submitWithdraw" ${!canWithdraw ? 'disabled' : ''}>Request Withdrawal</button>
                     </div>
                 </div>
                 ${renderBottomNav('')}
@@ -2583,7 +2585,7 @@
             });
             
             document.getElementById('backBtn')?.addEventListener('click', () => renderDashboard());
-            if (hasDeposit) {
+            if (canWithdraw) {
                 document.getElementById('submitWithdraw')?.addEventListener('click', async () => {
                     const amount = parseInt(document.getElementById('withdrawAmount').value);
                     const phone = document.getElementById('withdrawPhone').value;

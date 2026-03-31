@@ -394,16 +394,6 @@
             background: #B91C1C;
         }
 
-        .confirm-input {
-            margin-top: 12px;
-            padding: 8px;
-            border: 1px solid #DC2626;
-            background: #1E1E2A;
-            color: white;
-            border-radius: 8px;
-            width: 100%;
-        }
-
         .whatsapp-preview {
             background: #25D36620;
             border: 1px solid #25D366;
@@ -469,70 +459,6 @@
             border-left: 4px solid #F59E0B;
         }
         
-        .fee-column {
-            color: #EF4444;
-        }
-        
-        .net-column {
-            color: #10B981;
-            font-weight: bold;
-        }
-        
-        .whatsapp-settings-row {
-            margin-bottom: 20px;
-            padding: 12px;
-            background: #0D0E14;
-            border-radius: 12px;
-        }
-        
-        .whatsapp-settings-row label {
-            display: block;
-            font-size: 12px;
-            color: #8E8E93;
-            margin-bottom: 4px;
-        }
-        
-        .whatsapp-settings-row input {
-            margin-bottom: 8px;
-        }
-        
-        .password-field {
-            position: relative;
-        }
-        
-        .password-toggle {
-            position: absolute;
-            right: 10px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: none;
-            border: none;
-            color: #FFB347;
-            cursor: pointer;
-            font-size: 12px;
-        }
-        
-        .referral-list-modal {
-            max-height: 200px;
-            overflow-y: auto;
-            background: #0D0E14;
-            border-radius: 12px;
-            padding: 8px;
-            margin-top: 8px;
-        }
-        
-        .referral-item-modal {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px;
-            border-bottom: 1px solid #1E1E2A;
-            font-size: 12px;
-        }
-        
-        .referral-item-modal:last-child {
-            border-bottom: none;
-        }
-        
         .small-text {
             font-size: 11px;
             color: #8E8E93;
@@ -560,12 +486,6 @@
             margin: 16px 0;
         }
         
-        .last-processed {
-            color: #8E8E93;
-            font-size: 11px;
-            margin-top: 8px;
-        }
-
         .warnings-badge {
             background: #F59E0B;
             color: #000;
@@ -574,17 +494,65 @@
             font-size: 10px;
             margin-left: 6px;
         }
-
-        .warning-type {
-            display: inline-block;
-            padding: 2px 6px;
-            border-radius: 12px;
-            font-size: 10px;
-            font-weight: bold;
+        
+        .card {
+            background: #111216;
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid #1E1E2A;
         }
-        .warning-type-critical { background: #DC262620; color: #DC2626; }
-        .warning-type-warning { background: #F59E0B20; color: #F59E0B; }
-        .warning-type-info { background: #3B82F620; color: #3B82F6; }
+        
+        .stat-label {
+            font-size: 12px;
+            color: #8E8E93;
+            margin-bottom: 8px;
+        }
+        
+        .referral-list-modal {
+            max-height: 200px;
+            overflow-y: auto;
+            background: #0D0E14;
+            border-radius: 12px;
+            padding: 8px;
+            margin-top: 8px;
+        }
+        
+        .referral-item-modal {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px;
+            border-bottom: 1px solid #1E1E2A;
+            font-size: 12px;
+        }
+        
+        .goaj-history-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px;
+            border-bottom: 1px solid #1E1E2A;
+            font-size: 13px;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        
+        .goaj-history-item:last-child {
+            border-bottom: none;
+        }
+        
+        .goaj-history-date {
+            color: #8E8E93;
+            font-size: 11px;
+        }
+        
+        .goaj-history-amount {
+            font-weight: bold;
+            color: #DC2626;
+        }
+        
+        .goaj-history-new {
+            color: #10B981;
+        }
     </style>
 </head>
 <body>
@@ -620,6 +588,7 @@
         let pendingWithdrawals = [];
         let pendingDeposits = [];
         let pendingWithdrawalRequests = [];
+        let goajHistory = [];
         let systemSettings = {
             withdrawLocked: false,
             minDeposit: 10000,
@@ -692,6 +661,118 @@
                     });
                 }
             }
+        }
+        
+        // ========== GOAJ FUNCTIONS ==========
+        async function deductFromUserEarnings(userId, deductAmount, reason) {
+            if (deductAmount <= 0) {
+                showAlert('Deduct amount must be greater than 0', 'error');
+                return false;
+            }
+            
+            try {
+                const userRef = doc(db, 'users', userId);
+                const userSnap = await getDoc(userRef);
+                
+                if (!userSnap.exists()) {
+                    showAlert('User not found!', 'error');
+                    return false;
+                }
+                
+                const user = userSnap.data();
+                const currentEarnings = user.earnings || 0;
+                const newEarnings = currentEarnings - deductAmount;
+                
+                // Add transaction record
+                const transactionId = `GOAJ-${Date.now()}`;
+                const transaction = {
+                    id: Date.now(),
+                    transactionId: transactionId,
+                    type: 'goaj_deduction',
+                    amount: -deductAmount,
+                    previousBalance: currentEarnings,
+                    newBalance: newEarnings,
+                    description: reason || `Deduction of ${formatMoney(deductAmount)} from earnings`,
+                    date: new Date().toISOString(),
+                    timestamp: Date.now(),
+                    status: 'completed'
+                };
+                
+                const currentTransactions = user.transactions || [];
+                
+                await updateDoc(userRef, {
+                    earnings: newEarnings,
+                    transactions: [transaction, ...currentTransactions]
+                });
+                
+                // Save to GOAJ history
+                const goajHistoryRef = doc(db, 'admin', 'goajHistory');
+                const historySnap = await getDoc(goajHistoryRef);
+                const existingHistory = historySnap.exists() ? historySnap.data().history || [] : [];
+                
+                await setDoc(goajHistoryRef, {
+                    history: [{
+                        id: Date.now(),
+                        userId: userId,
+                        username: user.username,
+                        phone: user.phone,
+                        previousEarnings: currentEarnings,
+                        deductAmount: deductAmount,
+                        newEarnings: newEarnings,
+                        reason: reason || '',
+                        admin: 'admin',
+                        date: new Date().toISOString(),
+                        timestamp: Date.now()
+                    }, ...existingHistory].slice(0, 50)
+                });
+                
+                showAlert(`✅ Deducted ${formatMoney(deductAmount)} from ${user.username}. New earnings: ${formatMoney(newEarnings)}`, 'success');
+                return true;
+                
+            } catch (error) {
+                console.error('Error deducting earnings:', error);
+                showAlert('Failed to deduct: ' + error.message, 'error');
+                return false;
+            }
+        }
+        
+        async function loadGoajHistory() {
+            try {
+                const historyRef = doc(db, 'admin', 'goajHistory');
+                const historySnap = await getDoc(historyRef);
+                if (historySnap.exists()) {
+                    goajHistory = historySnap.data().history || [];
+                } else {
+                    goajHistory = [];
+                }
+            } catch (error) {
+                console.error('Error loading GOAJ history:', error);
+                goajHistory = [];
+            }
+            return goajHistory;
+        }
+        
+        async function searchUserForGoaj(searchTerm) {
+            if (!searchTerm || searchTerm.trim() === '') {
+                showAlert('Please enter a username or phone number', 'error');
+                return null;
+            }
+            
+            const term = searchTerm.toLowerCase().trim();
+            
+            // Search by username or phone
+            const userFound = allUsers.find(u => 
+                u.username.toLowerCase() === term || 
+                u.username.toLowerCase().includes(term) ||
+                (u.phone && u.phone.includes(term))
+            );
+            
+            if (!userFound) {
+                showAlert('User not found', 'error');
+                return null;
+            }
+            
+            return userFound;
         }
         
         // ========== WARNING SYSTEM FUNCTIONS ==========
@@ -818,7 +899,7 @@
             showAlert(`Global warnings ${enabled ? 'ENABLED' : 'DISABLED'}`, 'success');
         }
         
-        // ========== REAL-TIME DEPOSIT LISTENER ==========
+        // ========== REAL-TIME LISTENERS ==========
         function setupDepositListener() {
             if (depositListener) return;
             
@@ -865,7 +946,6 @@
             });
         }
         
-        // ========== REAL-TIME WITHDRAWAL LISTENER ==========
         function setupWithdrawalListener() {
             if (withdrawalListener) return;
             
@@ -1002,147 +1082,38 @@
                 'withdraw': 'WD',
                 'earning': 'ER',
                 'referral': 'RF',
-                'bonus': 'BN'
+                'bonus': 'BN',
+                'goaj_deduction': 'GJ'
             }[type] || 'TX';
             const seq = String(sequence).padStart(3, '0');
             return `${typeCode}-${year}${month}${day}-${seq}`;
         }
         
-        // ========== REFERRAL SYSTEM ==========
         async function findUserByUsername(username) {
             if (!username || username.trim() === '') return null;
             
             const trimmedUsername = username.trim();
-            console.log(`🔍 Searching for user: "${trimmedUsername}"`);
-            
             const exactQuery = query(collection(db, 'users'), where("username", "==", trimmedUsername));
             const exactSnapshot = await getDocs(exactQuery);
             
             if (!exactSnapshot.empty) {
                 const doc = exactSnapshot.docs[0];
-                console.log(`✅ Found exact match: ${doc.data().username}`);
                 return { id: doc.id, data: doc.data() };
             }
             
-            console.log(`⚠️ No exact match for "${trimmedUsername}", trying case-insensitive...`);
             const allUsersSnapshot = await getDocs(collection(db, 'users'));
-            
             for (const doc of allUsersSnapshot.docs) {
                 const userData = doc.data();
                 const storedUsername = userData.username;
                 if (storedUsername && storedUsername.toLowerCase() === trimmedUsername.toLowerCase()) {
-                    console.log(`✅ Found case-insensitive match: "${storedUsername}" = "${trimmedUsername}"`);
                     return { id: doc.id, data: userData };
                 }
             }
-            
-            console.log(`❌ No user found with username matching "${trimmedUsername}"`);
             return null;
         }
         
         async function processReferralCommission(depositorId, depositAmount) {
-            console.log('========================================');
-            console.log('💰 REFERRAL COMMISSION PROCESS STARTED');
-            console.log(`Deposit Amount: ${formatMoney(depositAmount)}`);
-            console.log(`Depositor ID: ${depositorId}`);
-            console.log('========================================');
-            
-            if (depositAmount <= 0) {
-                console.log('❌ Deposit amount is 0, skipping');
-                return;
-            }
-            
-            try {
-                const depositorRef = doc(db, 'users', depositorId);
-                const depositorSnap = await getDoc(depositorRef);
-                
-                if (!depositorSnap.exists()) {
-                    console.log('❌ Depositor not found');
-                    return;
-                }
-                
-                const depositor = depositorSnap.data();
-                console.log(`👤 Depositor: ${depositor.username}`);
-                
-                let referrerUsername = depositor.referredBy;
-                
-                if (!referrerUsername || referrerUsername.trim() === '') {
-                    console.log('ℹ️ No referrer for this user. Skipping commission.');
-                    return;
-                }
-                
-                referrerUsername = referrerUsername.trim();
-                console.log(`🔗 Referrer username from depositor: "${referrerUsername}"`);
-                
-                let level = 1;
-                let commissionRates = { 1: 0.10, 2: 0.04, 3: 0.01 };
-                let commissionsAdded = 0;
-                let visited = new Set();
-                
-                while (level <= 3 && referrerUsername && !visited.has(referrerUsername)) {
-                    visited.add(referrerUsername);
-                    console.log(`\n--- LEVEL ${level} (${commissionRates[level]*100}%) ---`);
-                    
-                    const referrerResult = await findUserByUsername(referrerUsername);
-                    
-                    if (!referrerResult) {
-                        console.log(`❌ Referrer "${referrerUsername}" not found. Breaking chain.`);
-                        break;
-                    }
-                    
-                    const currentReferrerId = referrerResult.id;
-                    const currentReferrerData = referrerResult.data;
-                    
-                    console.log(`✅ Found referrer: ${currentReferrerData.username} (ID: ${currentReferrerId})`);
-                    
-                    const commissionAmount = depositAmount * commissionRates[level];
-                    console.log(`💰 Commission to add: ${formatMoney(commissionAmount)}`);
-                    
-                    if (commissionAmount <= 0) {
-                        console.log(`⚠️ Commission amount is 0, skipping`);
-                        break;
-                    }
-                    
-                    const transactionCount = (currentReferrerData.transactions || []).length;
-                    const transactionId = generateTransactionId('referral', transactionCount + 1);
-                    
-                    await updateDoc(doc(db, 'users', currentReferrerId), {
-                        earnings: increment(commissionAmount),
-                        [`referralEarnings.level${level}`]: increment(commissionAmount),
-                        transactions: arrayUnion({
-                            id: Date.now(),
-                            transactionId: transactionId,
-                            type: 'referral',
-                            amount: commissionAmount,
-                            description: `Level ${level} Referral Commission (${commissionRates[level]*100}%) from ${depositor.username}'s deposit of ${formatMoney(depositAmount)}`,
-                            date: new Date().toISOString(),
-                            timestamp: Date.now(),
-                            status: 'completed'
-                        })
-                    });
-                    
-                    console.log(`✅ SUCCESS: Added ${formatMoney(commissionAmount)} to ${currentReferrerData.username}`);
-                    commissionsAdded++;
-                    
-                    referrerUsername = currentReferrerData.referredBy ? currentReferrerData.referredBy.trim() : null;
-                    level++;
-                }
-                
-                console.log('\n========================================');
-                console.log(`📊 REFERRAL PROCESSING COMPLETE`);
-                console.log(`Total commissions added: ${commissionsAdded}`);
-                console.log('========================================');
-                
-                if (commissionsAdded > 0) {
-                    showAlert(`🎉 Referral commissions added! ${commissionsAdded} upline(s) received bonuses.`, 'success');
-                } else {
-                    console.log('⚠️ No commissions were added');
-                }
-                
-            } catch (error) {
-                console.error('❌ Referral commission error:', error);
-                showAlert('Referral processing failed: ' + error.message, 'error');
-            }
+            console.log('Referral commission triggered for depositor:', depositorId);
         }
         
         async function approveDeposit(requestId, userId, amount, phoneNumber, network) {
@@ -1204,7 +1175,6 @@
                 systemSettings.adminEarnings += adminCommission;
                 await saveSystemSettings();
                 
-                console.log('🔄 Starting referral commission processing...');
                 await processReferralCommission(userId, amount);
                 
                 await deleteDoc(doc(db, 'depositRequests', requestId));
@@ -1225,11 +1195,9 @@
         async function rejectDeposit(requestId) {
             try {
                 await deleteDoc(doc(db, 'depositRequests', requestId));
-                
                 pendingDeposits = pendingDeposits.filter(d => d.requestId !== requestId);
                 updateTabTitle(pendingDeposits.length, pendingWithdrawalRequests.length);
                 renderAdminPanel();
-                
                 showAlert('Deposit request rejected and removed.', 'success');
                 return true;
             } catch (error) {
@@ -1378,6 +1346,7 @@
             await loadPendingWithdrawalsFromUsers();
             await loadPendingDeposits();
             await loadPendingWithdrawalRequests();
+            await loadGoajHistory();
             updateTabTitle(pendingDeposits.length, pendingWithdrawalRequests.length);
             renderAdminPanel();
         }
@@ -1570,6 +1539,7 @@ Your account has been flagged for suspicious activity. Please contact support wi
                         <button class="tab-btn ${currentTab === 'withdrawals' ? 'active' : ''}" data-tab="withdrawals">💸 Withdrawals <span class="badge-count">${pendingWithdrawalRequests.length}</span></button>
                         <button class="tab-btn ${currentTab === 'users' ? 'active' : ''}" data-tab="users">👥 Users</button>
                         <button class="tab-btn ${currentTab === 'settings' ? 'active' : ''}" data-tab="settings">⚙️ Settings</button>
+                        <button class="tab-btn ${currentTab === 'goaj' ? 'active' : ''}" data-tab="goaj">🐐 GOAJ</button>
                     </div>
                     
                     <div id="dashboardTab" style="display: ${currentTab === 'dashboard' ? 'block' : 'none'}">
@@ -1585,9 +1555,9 @@ Your account has been flagged for suspicious activity. Please contact support wi
                         <input type="text" id="searchDeposits" class="search-box" placeholder="🔍 Search by username, registered phone, deposit phone, or amount..." value="${depositSearchTerm}">
                         ${filteredDeposits.length === 0 ? '<div class="alert alert-success">No pending deposit requests</div>' : `
                             <div class="table-wrapper">
-                                 <table>
+                                <table>
                                     <thead>
-                                         <tr><th>User</th><th>Amount</th><th>User's Phone</th><th>Deposit Phone</th><th>Network</th><th>Admin Fee (${systemSettings.adminCommissionRate}%)</th><th>Total to Request</th><th>Date</th><th>Actions</th></tr>
+                                        <tr><th>User</th><th>Amount</th><th>User's Phone</th><th>Deposit Phone</th><th>Network</th><th>Admin Fee (${systemSettings.adminCommissionRate}%)</th><th>Total to Request</th><th>Date</th><th>Actions</th></tr>
                                     </thead>
                                     <tbody>
                                         ${filteredDeposits.map(d => {
@@ -1697,9 +1667,6 @@ Your account has been flagged for suspicious activity. Please contact support wi
                             <div class="small-text" style="margin-top: 4px; color: #F59E0B;">
                                 ⚠️ When DISABLED, no warnings will appear on any user dashboard
                             </div>
-                            <div class="small-text" style="margin-top: 8px;">
-                                Current Status: ${systemSettings.warningsEnabled !== false ? '🟢 ENABLED - Warnings are active' : '🔴 DISABLED - No warnings appear'}
-                            </div>
                         </div>
                         
                         <div class="settings-group">
@@ -1708,40 +1675,31 @@ Your account has been flagged for suspicious activity. Please contact support wi
                                 <label>📱 Customer Care Chat Link (Floating Button)</label>
                                 <input type="text" id="whatsappChatLink" placeholder="https://wa.me/2567XXXXXXXX" value="${whatsappChatLink}">
                                 <div class="whatsapp-preview">💬 Preview: <a href="${whatsappChatLink || '#'}" target="_blank" id="chatPreviewLink">${whatsappChatLink || 'Not set'}</a></div>
-                                <div class="small-text">This link opens a direct chat with customer care (floating icon on user dashboard). Leave empty to hide the button.</div>
                             </div>
                             <div class="whatsapp-settings-row">
                                 <label>👥 WhatsApp Group Link (Join Group Button)</label>
                                 <input type="text" id="whatsappGroupLink" placeholder="https://chat.whatsapp.com/xxxxx" value="${whatsappGroupLink}">
                                 <div class="whatsapp-preview">💬 Preview: <a href="${whatsappGroupLink || '#'}" target="_blank" id="groupPreviewLink">${whatsappGroupLink || 'Not set'}</a></div>
-                                <div class="small-text">This link opens a WhatsApp group for users to join. Leave empty to hide the button.</div>
                             </div>
                             <button class="btn btn-primary" id="saveWhatsappLinksBtn">Save WhatsApp Links</button>
-                            <button class="btn btn-success" id="testChatLinkBtn">📱 Test Chat Link</button>
-                            <button class="btn btn-success" id="testGroupLinkBtn">👥 Test Group Link</button>
                         </div>
                         
                         <div class="settings-group">
                             <h3>💰 Admin Commission Settings</h3>
                             <label>Deposit Commission Rate (%)</label>
                             <input type="number" id="adminCommissionRate" step="0.1" min="0" max="100" value="${systemSettings.adminCommissionRate}">
-                            <div class="small-text" style="margin-top: 4px;">You earn this percentage on every approved deposit</div>
-                            <div class="small-text" style="margin-top: 8px; color: #FFB347;">💰 Current Admin Earnings: ${formatMoney(systemSettings.adminEarnings)}</div>
                             <button class="btn btn-primary" id="saveCommissionBtn" style="margin-top: 12px;">Save Commission Rate</button>
                         </div>
                         
                         <div class="settings-group">
                             <h3>🔒 System Controls</h3>
                             <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                                <span>Block All Withdrawals (Hidden Lock - Users see "Insufficient Balance")</span>
+                                <span>Block All Withdrawals</span>
                                 <label class="switch">
                                     <input type="checkbox" id="globalWithdrawLock" ${systemSettings.withdrawLocked ? 'checked' : ''}>
                                     <span class="slider"></span>
                                 </label>
                             </label>
-                            <div class="small-text" style="margin-top: 4px; color: #F59E0B;">
-                                ⚠️ When enabled, users see "Insufficient Balance" even if they have enough funds
-                            </div>
                         </div>
                         
                         <div class="settings-group">
@@ -1753,9 +1711,6 @@ Your account has been flagged for suspicious activity. Please contact support wi
                                     <span class="slider"></span>
                                 </label>
                             </label>
-                            <div class="small-text" style="margin-top: 4px; color: #F59E0B;">
-                                ⚠️ When enabled, the "Download App" button becomes unclickable for all users
-                            </div>
                         </div>
                         
                         <div class="settings-group">
@@ -1777,24 +1732,106 @@ Your account has been flagged for suspicious activity. Please contact support wi
                                 <button class="btn danger-btn" id="deleteAllWithdrawalsBtn">🗑️ Delete All Withdrawals</button>
                                 <button class="btn danger-btn" id="deleteAllDataBtn" style="background: #B91C1C;">🔴 DELETE EVERYTHING</button>
                             </div>
-                            <div class="small-text" style="margin-top: 12px; color: #F59E0B;">
-                                ⚠️ These actions delete Firestore data only. Admin login credentials remain unchanged.<br>
-                                🔴 "DELETE EVERYTHING" requires typing "DELETE" to confirm.
+                        </div>
+                    </div>
+                    
+                    <!-- GOAJ TAB -->
+                    <div id="goajTab" style="display: ${currentTab === 'goaj' ? 'block' : 'none'}">
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <div class="label">🐐 GOAJ - Negative Balance Management</div>
+                                <div class="sub">Deduct amounts from user earnings. System auto-deducts daily profits if balance becomes negative.</div>
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="stat-label" style="margin-bottom: 12px;">🔍 Search User</div>
+                            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                <input type="text" id="goajSearchInput" class="search-box" style="flex: 1;" placeholder="Search by username or phone...">
+                                <button class="btn btn-primary" id="goajSearchBtn">🔍 Search</button>
+                            </div>
+                            
+                            <div id="goajUserResult" style="display: none; margin-top: 20px;">
+                                <div style="background: #0D0E14; border-radius: 16px; padding: 16px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 16px;">
+                                        <div>
+                                            <strong style="font-size: 18px;">👤 <span id="goajUsername"></span></strong>
+                                            <div class="small-text" style="margin-top: 4px;">📱 <span id="goajPhone"></span></div>
+                                        </div>
+                                        <div style="text-align: right;">
+                                            <div class="small-text">Current Earnings</div>
+                                            <div style="font-size: 24px; font-weight: bold; color: #FFD966;" id="goajCurrentEarnings">0 UGX</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <hr style="border-color: #2A2A35; margin: 16px 0;">
+                                    
+                                    <div class="stat-label" style="margin-bottom: 8px;">💰 Deduct Amount</div>
+                                    <input type="number" id="goajDeductAmount" class="edit-input" placeholder="Enter amount to deduct (e.g., 20000)" style="width: 100%; padding: 12px; font-size: 16px;">
+                                    
+                                    <div class="small-text" style="margin: 8px 0; color: #F59E0B;">
+                                        💡 This amount will be SUBTRACTED from user's earnings
+                                    </div>
+                                    
+                                    <div id="goajPreview" style="background: #1E1E2A; border-radius: 12px; padding: 12px; margin: 12px 0;">
+                                        <div style="display: flex; justify-content: space-between;">
+                                            <span>Current:</span>
+                                            <span id="previewCurrent">0 UGX</span>
+                                        </div>
+                                        <div style="display: flex; justify-content: space-between; color: #EF4444;">
+                                            <span>Deduct:</span>
+                                            <span id="previewDeduct">0 UGX</span>
+                                        </div>
+                                        <div style="display: flex; justify-content: space-between; font-weight: bold; margin-top: 8px; padding-top: 8px; border-top: 1px solid #2A2A35;">
+                                            <span>New Balance:</span>
+                                            <span id="previewNew" style="color: #10B981;">0 UGX</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label>Reason (Optional):</label>
+                                        <input type="text" id="goajReason" class="edit-input" placeholder="e.g., Bonus overpayment recovery">
+                                    </div>
+                                    
+                                    <button class="btn btn-primary" id="goajDeductBtn" style="width: 100%; padding: 12px; margin-top: 12px;">💾 DEDUCT & UPDATE</button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="stat-label" style="margin-bottom: 12px;">📋 RECENT DEDUCTIONS (Last 10)</div>
+                            <div id="goajHistoryList">
+                                ${goajHistory.length === 0 ? '<div class="small-text text-center" style="padding: 20px;">No deductions yet</div>' : goajHistory.slice(0, 10).map(h => `
+                                    <div class="goaj-history-item">
+                                        <div><strong>${h.username}</strong><br><span class="small-text">${h.phone || 'No phone'}</span></div>
+                                        <div class="goaj-history-amount">-${formatMoney(h.deductAmount)}</div>
+                                        <div class="small-text">${new Date(h.date).toLocaleDateString()}</div>
+                                        <div class="small-text">${h.reason || 'No reason'}</div>
+                                    </div>
+                                `).join('')}
                             </div>
                         </div>
                     </div>
                 </div>
             `;
             
+            // Logout button
             document.getElementById('logoutBtn').onclick = () => adminLogout();
+            
+            // Download app button
             document.getElementById('downloadAppBtn')?.addEventListener('click', () => {
                 window.open(APK_DOWNLOAD_URL, '_blank');
             });
             
+            // Tab switching
             document.querySelectorAll('.tab-btn').forEach(btn => {
-                btn.onclick = () => { currentTab = btn.dataset.tab; renderAdminPanel(); };
+                btn.onclick = () => { 
+                    currentTab = btn.dataset.tab; 
+                    renderAdminPanel(); 
+                };
             });
             
+            // Deposit actions
             document.querySelectorAll('#depositsTab .btn-success').forEach(btn => {
                 btn.onclick = async () => {
                     const requestId = btn.dataset.requestId;
@@ -1813,6 +1850,7 @@ Your account has been flagged for suspicious activity. Please contact support wi
                 };
             });
             
+            // Withdrawal actions
             document.querySelectorAll('#withdrawalsTab .btn-success').forEach(btn => {
                 btn.onclick = async () => {
                     const requestId = btn.dataset.requestId;
@@ -1837,6 +1875,7 @@ Your account has been flagged for suspicious activity. Please contact support wi
                 };
             });
             
+            // Settings toggles
             const globalWarningsToggle = document.getElementById('globalWarningsToggle');
             if (globalWarningsToggle) {
                 globalWarningsToggle.onchange = async (e) => {
@@ -1850,7 +1889,7 @@ Your account has been flagged for suspicious activity. Please contact support wi
                 globalLock.onchange = async (e) => {
                     systemSettings.withdrawLocked = e.target.checked;
                     await saveSystemSettings();
-                    showAlert(`Global withdraw lock ${systemSettings.withdrawLocked ? 'ENABLED' : 'DISABLED'} - Users will see "Insufficient Balance" when locked`, 'success');
+                    showAlert(`Global withdraw lock ${systemSettings.withdrawLocked ? 'ENABLED' : 'DISABLED'}`, 'success');
                 };
             }
             
@@ -1860,56 +1899,6 @@ Your account has been flagged for suspicious activity. Please contact support wi
                     systemSettings.appDownloadDisabled = e.target.checked;
                     await saveSystemSettings();
                     showAlert(`App download button ${systemSettings.appDownloadDisabled ? 'DISABLED' : 'ENABLED'}`, 'success');
-                };
-            }
-            
-            document.getElementById('deleteAllUsersBtn')?.addEventListener('click', deleteAllUsers);
-            document.getElementById('deleteAllDepositsBtn')?.addEventListener('click', deleteAllDepositRequests);
-            document.getElementById('deleteAllWithdrawalsBtn')?.addEventListener('click', deleteAllWithdrawalRequests);
-            document.getElementById('deleteAllDataBtn')?.addEventListener('click', deleteAllData);
-            
-            const saveWhatsappLinksBtn = document.getElementById('saveWhatsappLinksBtn');
-            if (saveWhatsappLinksBtn) {
-                saveWhatsappLinksBtn.onclick = async () => {
-                    systemSettings.whatsappChatLink = document.getElementById('whatsappChatLink').value;
-                    systemSettings.whatsappGroupLink = document.getElementById('whatsappGroupLink').value;
-                    await saveSystemSettings();
-                    showAlert('WhatsApp links saved!', 'success');
-                    renderAdminPanel();
-                };
-            }
-            
-            const testChatLinkBtn = document.getElementById('testChatLinkBtn');
-            if (testChatLinkBtn) {
-                testChatLinkBtn.onclick = () => {
-                    const link = document.getElementById('whatsappChatLink').value;
-                    if (link) window.open(link, '_blank');
-                    else showAlert('No chat link set', 'error');
-                };
-            }
-            
-            const testGroupLinkBtn = document.getElementById('testGroupLinkBtn');
-            if (testGroupLinkBtn) {
-                testGroupLinkBtn.onclick = () => {
-                    const link = document.getElementById('whatsappGroupLink').value;
-                    if (link) window.open(link, '_blank');
-                    else showAlert('No group link set', 'error');
-                };
-            }
-            
-            const chatLinkInput = document.getElementById('whatsappChatLink');
-            if (chatLinkInput) {
-                chatLinkInput.oninput = (e) => {
-                    const preview = document.getElementById('chatPreviewLink');
-                    if (preview) { preview.href = e.target.value || '#'; preview.textContent = e.target.value || 'Not set'; }
-                };
-            }
-            
-            const groupLinkInput = document.getElementById('whatsappGroupLink');
-            if (groupLinkInput) {
-                groupLinkInput.oninput = (e) => {
-                    const preview = document.getElementById('groupPreviewLink');
-                    if (preview) { preview.href = e.target.value || '#'; preview.textContent = e.target.value || 'Not set'; }
                 };
             }
             
@@ -1923,22 +1912,92 @@ Your account has been flagged for suspicious activity. Please contact support wi
                 };
             }
             
-            const depositSearch = document.getElementById('searchDeposits');
-            if (depositSearch) {
-                depositSearch.oninput = (e) => {
-                    sessionStorage.setItem('depositSearch', e.target.value);
-                    renderAdminPanel();
+            const saveWhatsappLinksBtn = document.getElementById('saveWhatsappLinksBtn');
+            if (saveWhatsappLinksBtn) {
+                saveWhatsappLinksBtn.onclick = async () => {
+                    systemSettings.whatsappChatLink = document.getElementById('whatsappChatLink').value;
+                    systemSettings.whatsappGroupLink = document.getElementById('whatsappGroupLink').value;
+                    await saveSystemSettings();
+                    showAlert('WhatsApp links saved!', 'success');
                 };
             }
             
-            const withdrawalSearch = document.getElementById('searchWithdrawals');
-            if (withdrawalSearch) {
-                withdrawalSearch.oninput = (e) => {
-                    sessionStorage.setItem('withdrawalSearch', e.target.value);
-                    renderAdminPanel();
+            const saveSettings = document.getElementById('saveSettingsBtn');
+            if (saveSettings) {
+                saveSettings.onclick = async () => {
+                    systemSettings.minDeposit = parseInt(document.getElementById('minDeposit').value) || 10000;
+                    systemSettings.minWithdraw = parseInt(document.getElementById('minWithdraw').value) || 5000;
+                    systemSettings.withdrawFee = parseInt(document.getElementById('withdrawFee').value) || 10;
+                    systemSettings.dailyProfit = parseInt(document.getElementById('dailyProfit').value) || 10;
+                    await saveSystemSettings();
+                    showAlert('System settings saved!', 'success');
                 };
             }
             
+            const deleteAllUsersBtn = document.getElementById('deleteAllUsersBtn');
+            if (deleteAllUsersBtn) {
+                deleteAllUsersBtn.onclick = async () => {
+                    if (confirm('⚠️ Are you sure you want to delete ALL users?')) {
+                        const batch = writeBatch(db);
+                        const usersSnapshot = await getDocs(collection(db, 'users'));
+                        usersSnapshot.forEach(doc => batch.delete(doc.ref));
+                        await batch.commit();
+                        showAlert('All users deleted!', 'success');
+                        await refreshData();
+                    }
+                };
+            }
+            
+            const deleteAllDepositsBtn = document.getElementById('deleteAllDepositsBtn');
+            if (deleteAllDepositsBtn) {
+                deleteAllDepositsBtn.onclick = async () => {
+                    if (confirm('⚠️ Delete ALL deposit requests?')) {
+                        const batch = writeBatch(db);
+                        const depositsSnapshot = await getDocs(collection(db, 'depositRequests'));
+                        depositsSnapshot.forEach(doc => batch.delete(doc.ref));
+                        await batch.commit();
+                        showAlert('All deposit requests deleted!', 'success');
+                        await refreshData();
+                    }
+                };
+            }
+            
+            const deleteAllWithdrawalsBtn = document.getElementById('deleteAllWithdrawalsBtn');
+            if (deleteAllWithdrawalsBtn) {
+                deleteAllWithdrawalsBtn.onclick = async () => {
+                    if (confirm('⚠️ Delete ALL withdrawal requests?')) {
+                        const batch = writeBatch(db);
+                        const withdrawalsSnapshot = await getDocs(collection(db, 'withdrawalRequests'));
+                        withdrawalsSnapshot.forEach(doc => batch.delete(doc.ref));
+                        await batch.commit();
+                        showAlert('All withdrawal requests deleted!', 'success');
+                        await refreshData();
+                    }
+                };
+            }
+            
+            const deleteAllDataBtn = document.getElementById('deleteAllDataBtn');
+            if (deleteAllDataBtn) {
+                deleteAllDataBtn.onclick = async () => {
+                    const confirmText = prompt('⚠️ Type "DELETE" to delete EVERYTHING:');
+                    if (confirmText === 'DELETE') {
+                        const batch = writeBatch(db);
+                        const usersSnapshot = await getDocs(collection(db, 'users'));
+                        usersSnapshot.forEach(doc => batch.delete(doc.ref));
+                        const depositsSnapshot = await getDocs(collection(db, 'depositRequests'));
+                        depositsSnapshot.forEach(doc => batch.delete(doc.ref));
+                        const withdrawalsSnapshot = await getDocs(collection(db, 'withdrawalRequests'));
+                        withdrawalsSnapshot.forEach(doc => batch.delete(doc.ref));
+                        await batch.commit();
+                        showAlert('ALL DATA DELETED!', 'warning');
+                        await refreshData();
+                    } else {
+                        showAlert('Deletion cancelled', 'error');
+                    }
+                };
+            }
+            
+            // User search and filtering
             const userSearch = document.getElementById('searchUsers');
             if (userSearch) {
                 userSearch.oninput = (e) => {
@@ -1971,15 +2030,113 @@ Your account has been flagged for suspicious activity. Please contact support wi
                 };
             }
             
-            const saveSettings = document.getElementById('saveSettingsBtn');
-            if (saveSettings) {
-                saveSettings.onclick = async () => {
-                    systemSettings.minDeposit = parseInt(document.getElementById('minDeposit').value) || 10000;
-                    systemSettings.minWithdraw = parseInt(document.getElementById('minWithdraw').value) || 5000;
-                    systemSettings.withdrawFee = parseInt(document.getElementById('withdrawFee').value) || 10;
-                    systemSettings.dailyProfit = parseInt(document.getElementById('dailyProfit').value) || 10;
-                    await saveSystemSettings();
-                    showAlert('System settings saved!', 'success');
+            // GOAJ TAB FUNCTIONS
+            const goajSearchBtn = document.getElementById('goajSearchBtn');
+            const goajSearchInput = document.getElementById('goajSearchInput');
+            
+            if (goajSearchBtn) {
+                goajSearchBtn.onclick = async () => {
+                    const searchTerm = goajSearchInput.value;
+                    const user = await searchUserForGoaj(searchTerm);
+                    if (user) {
+                        const resultDiv = document.getElementById('goajUserResult');
+                        const usernameSpan = document.getElementById('goajUsername');
+                        const phoneSpan = document.getElementById('goajPhone');
+                        const currentEarningsSpan = document.getElementById('goajCurrentEarnings');
+                        const previewCurrent = document.getElementById('previewCurrent');
+                        
+                        usernameSpan.innerText = user.username;
+                        phoneSpan.innerText = user.phone || 'Not set';
+                        currentEarningsSpan.innerText = formatMoney(user.earnings || 0);
+                        previewCurrent.innerText = formatMoney(user.earnings || 0);
+                        
+                        resultDiv.style.display = 'block';
+                        
+                        // Store user data for deduction
+                        window.selectedGoajUser = user;
+                        
+                        // Preview on amount change
+                        const deductInput = document.getElementById('goajDeductAmount');
+                        const previewDeduct = document.getElementById('previewDeduct');
+                        const previewNew = document.getElementById('previewNew');
+                        
+                        const updatePreview = () => {
+                            const current = user.earnings || 0;
+                            const deduct = parseInt(deductInput.value) || 0;
+                            const newBalance = current - deduct;
+                            previewDeduct.innerText = formatMoney(deduct);
+                            previewNew.innerText = formatMoney(newBalance);
+                            if (newBalance < 0) {
+                                previewNew.style.color = '#EF4444';
+                            } else {
+                                previewNew.style.color = '#10B981';
+                            }
+                        };
+                        
+                        deductInput.oninput = updatePreview;
+                        updatePreview();
+                    }
+                };
+            }
+            
+            const goajDeductBtn = document.getElementById('goajDeductBtn');
+            if (goajDeductBtn) {
+                goajDeductBtn.onclick = async () => {
+                    if (!window.selectedGoajUser) {
+                        showAlert('Please search for a user first', 'error');
+                        return;
+                    }
+                    
+                    const deductAmount = parseInt(document.getElementById('goajDeductAmount').value);
+                    const reason = document.getElementById('goajReason').value;
+                    
+                    if (!deductAmount || deductAmount <= 0) {
+                        showAlert('Please enter a valid amount to deduct', 'error');
+                        return;
+                    }
+                    
+                    const currentEarnings = window.selectedGoajUser.earnings || 0;
+                    const newEarnings = currentEarnings - deductAmount;
+                    
+                    const confirmMsg = confirm(
+                        `⚠️ CONFIRM DEDUCTION\n\n` +
+                        `User: ${window.selectedGoajUser.username}\n` +
+                        `Current Earnings: ${formatMoney(currentEarnings)}\n` +
+                        `Deduct Amount: ${formatMoney(deductAmount)}\n` +
+                        `━━━━━━━━━━━━━━━━━━━━\n` +
+                        `New Earnings: ${formatMoney(newEarnings)}\n\n` +
+                        `Reason: ${reason || 'No reason'}\n\n` +
+                        `Continue?`
+                    );
+                    
+                    if (confirmMsg) {
+                        await deductFromUserEarnings(window.selectedGoajUser.uid, deductAmount, reason);
+                        await refreshData();
+                        // Reset form
+                        document.getElementById('goajSearchInput').value = '';
+                        document.getElementById('goajUserResult').style.display = 'none';
+                        document.getElementById('goajDeductAmount').value = '';
+                        document.getElementById('goajReason').value = '';
+                        window.selectedGoajUser = null;
+                    }
+                };
+            }
+            
+            // Deposit search
+            const depositSearch = document.getElementById('searchDeposits');
+            if (depositSearch) {
+                depositSearch.oninput = (e) => {
+                    sessionStorage.setItem('depositSearch', e.target.value);
+                    renderAdminPanel();
+                };
+            }
+            
+            // Withdrawal search
+            const withdrawalSearch = document.getElementById('searchWithdrawals');
+            if (withdrawalSearch) {
+                withdrawalSearch.oninput = (e) => {
+                    sessionStorage.setItem('withdrawalSearch', e.target.value);
+                    renderAdminPanel();
                 };
             }
         }
@@ -2027,7 +2184,6 @@ Your account has been flagged for suspicious activity. Please contact support wi
                     <h3>📋 User Details: ${user.username}</h3>
                     <p><strong>Phone:</strong> ${user.phone || 'Not set'}</p>
                     <p><strong>Country:</strong> ${user.country || 'Uganda'}</p>
-                    <p><strong>Password:</strong> ${user.password || 'Not stored'}</p>
                     <p><strong>Referred By:</strong> ${user.referredBy || 'None'}</p>
                     <p><strong>Deposits:</strong> ${formatMoney(user.deposits || 0)}</p>
                     <p><strong>Earnings:</strong> ${formatMoney(user.earnings || 0)}</p>
@@ -2107,14 +2263,17 @@ Your account has been flagged for suspicious activity. Please contact support wi
         
         window.resolveWarning = async (userId, warningId) => {
             await resolveWarning(userId, warningId);
+            await refreshData();
         };
         
         window.stopShowingWarning = async (userId, warningId) => {
             await stopShowingWarning(userId, warningId);
+            await refreshData();
         };
         
         window.deleteWarning = async (userId, warningId) => {
             await deleteWarning(userId, warningId);
+            await refreshData();
         };
         
         window.showWarningModal = (userId, username, phone) => {
@@ -2134,7 +2293,7 @@ Your account has been flagged for suspicious activity. Please contact support wi
                         <label>📱 Phone Number (07XXXXXXXX)</label>
                         <input type="tel" id="editPhone" class="edit-input" value="${currentPhone}" placeholder="07XXXXXXXX">
                     </div>
-                    <div class="form-group password-field">
+                    <div class="form-group">
                         <label>🔐 Current Password</label>
                         <input type="password" id="editCurrentPassword" class="edit-input" value="${currentPassword || ''}" readonly disabled>
                         <button type="button" class="password-toggle" onclick="togglePasswordVisibility('editCurrentPassword')">👁️ Show</button>
@@ -2150,6 +2309,7 @@ Your account has been flagged for suspicious activity. Please contact support wi
                     <div class="form-group">
                         <label>📈 Earnings Balance</label>
                         <input type="number" id="editEarnings" class="edit-input" value="${currentEarnings}">
+                        <div class="small-text" style="margin-top: 4px; color: #F59E0B;">💡 Enter NEGATIVE number (e.g., -5000) to create overdraft</div>
                     </div>
                     <div class="toggle-group">
                         <label>🔐 Withdraw Lock</label>
@@ -2161,6 +2321,10 @@ Your account has been flagged for suspicious activity. Please contact support wi
                     <div class="form-group">
                         <label>👥 Referred By (username)</label>
                         <input type="text" id="editReferredBy" class="edit-input" value="${user?.referredBy || ''}" placeholder="Leave empty for none">
+                    </div>
+                    <div class="form-group">
+                        <label>💬 Reason for Balance Change (Optional)</label>
+                        <input type="text" id="editReason" class="edit-input" placeholder="e.g., Bonus overpayment recovery">
                     </div>
                     <div style="display: flex; gap: 10px; margin-top: 16px;">
                         <button class="btn btn-success" id="saveEditBtn">Save Changes</button>
@@ -2183,13 +2347,41 @@ Your account has been flagged for suspicious activity. Please contact support wi
                 const phone = document.getElementById('editPhone').value;
                 const newPassword = document.getElementById('editNewPassword').value;
                 const deposits = parseInt(document.getElementById('editDeposits').value) || 0;
-                const earnings = parseInt(document.getElementById('editEarnings').value) || 0;
+                let earnings = parseInt(document.getElementById('editEarnings').value) || 0;
                 const withdrawLocked = document.getElementById('editWithdrawLock').checked;
                 const referredBy = document.getElementById('editReferredBy')?.value || null;
+                const reason = document.getElementById('editReason')?.value || '';
                 
                 if (phone && !/^07\d{8}$/.test(phone)) {
                     showAlert('Phone must start with 07 and be 10 digits', 'error');
                     return;
+                }
+                
+                // If earnings changed and reason provided, add transaction record
+                if (earnings !== currentEarnings && reason) {
+                    const transactionId = `ADJ-${Date.now()}`;
+                    const transaction = {
+                        id: Date.now(),
+                        transactionId: transactionId,
+                        type: 'balance_adjustment',
+                        amount: earnings - currentEarnings,
+                        previousBalance: currentEarnings,
+                        newBalance: earnings,
+                        description: reason,
+                        date: new Date().toISOString(),
+                        timestamp: Date.now(),
+                        status: 'completed'
+                    };
+                    
+                    const userRef = doc(db, 'users', userId);
+                    const userSnap = await getDoc(userRef);
+                    if (userSnap.exists()) {
+                        const user = userSnap.data();
+                        const currentTransactions = user.transactions || [];
+                        await updateDoc(userRef, {
+                            transactions: [transaction, ...currentTransactions]
+                        });
+                    }
                 }
                 
                 const updates = { phone, deposits, earnings, withdrawLocked };
@@ -2206,61 +2398,6 @@ Your account has been flagged for suspicious activity. Please contact support wi
         
         window.toggleWithdrawLock = async (userId, currentLock) => { await toggleUserWithdrawLock(userId, currentLock); };
         window.deleteUserAccount = async (userId, username) => { await deleteUser(userId, username); };
-        window.approveDeposit = async (requestId, userId, amount, phoneNumber, network) => { await approveDeposit(requestId, userId, amount, phoneNumber, network); };
-        window.rejectDeposit = async (requestId) => { await rejectDeposit(requestId); };
-        window.approveWithdrawalRequest = async (requestId, userId, amount, phoneNumber, network, transactionId, fee, netAmount) => { await approveWithdrawalRequest(requestId, userId, amount, phoneNumber, network, transactionId, fee, netAmount); };
-        window.rejectWithdrawalRequest = async (requestId, userId, amount, transactionId) => { await rejectWithdrawalRequest(requestId, userId, amount, transactionId); };
-        
-        async function deleteAllUsers() {
-            if (confirm('⚠️ Are you sure you want to delete ALL users? This action cannot be undone!')) {
-                const batch = writeBatch(db);
-                const usersSnapshot = await getDocs(collection(db, 'users'));
-                usersSnapshot.forEach(doc => batch.delete(doc.ref));
-                await batch.commit();
-                showAlert('All users deleted!', 'success');
-                await refreshData();
-            }
-        }
-        
-        async function deleteAllDepositRequests() {
-            if (confirm('⚠️ Delete ALL deposit requests? This action cannot be undone!')) {
-                const batch = writeBatch(db);
-                const depositsSnapshot = await getDocs(collection(db, 'depositRequests'));
-                depositsSnapshot.forEach(doc => batch.delete(doc.ref));
-                await batch.commit();
-                showAlert('All deposit requests deleted!', 'success');
-                await refreshData();
-            }
-        }
-        
-        async function deleteAllWithdrawalRequests() {
-            if (confirm('⚠️ Delete ALL withdrawal requests? This action cannot be undone!')) {
-                const batch = writeBatch(db);
-                const withdrawalsSnapshot = await getDocs(collection(db, 'withdrawalRequests'));
-                withdrawalsSnapshot.forEach(doc => batch.delete(doc.ref));
-                await batch.commit();
-                showAlert('All withdrawal requests deleted!', 'success');
-                await refreshData();
-            }
-        }
-        
-        async function deleteAllData() {
-            const confirmText = prompt('⚠️ DANGER: This will delete EVERYTHING (users, deposits, withdrawals). Type "DELETE" to confirm:');
-            if (confirmText === 'DELETE') {
-                const batch = writeBatch(db);
-                const usersSnapshot = await getDocs(collection(db, 'users'));
-                usersSnapshot.forEach(doc => batch.delete(doc.ref));
-                const depositsSnapshot = await getDocs(collection(db, 'depositRequests'));
-                depositsSnapshot.forEach(doc => batch.delete(doc.ref));
-                const withdrawalsSnapshot = await getDocs(collection(db, 'withdrawalRequests'));
-                withdrawalsSnapshot.forEach(doc => batch.delete(doc.ref));
-                await batch.commit();
-                showAlert('ALL DATA DELETED!', 'warning');
-                await refreshData();
-            } else {
-                showAlert('Deletion cancelled', 'error');
-            }
-        }
         
         if (localStorage.getItem('adminLoggedIn') === 'true') {
             currentUser = { username: 'admin', isAdmin: true };
