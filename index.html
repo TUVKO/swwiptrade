@@ -852,6 +852,99 @@
             margin-top: 4px;
         }
         
+        /* Warning Modal Styles - Full Screen */
+        .warning-fullscreen-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.95);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        .warning-modal-content {
+            background: #111216;
+            border-radius: 32px;
+            padding: 32px 24px;
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+            border: 2px solid #F59E0B;
+            box-shadow: 0 0 40px rgba(245, 158, 11, 0.3);
+            animation: popIn 0.3s ease;
+        }
+        
+        .warning-modal-content.warning {
+            border-color: #F59E0B;
+        }
+        
+        .warning-modal-content.suspension {
+            border-color: #DC2626;
+        }
+        
+        .warning-modal-content.restriction {
+            border-color: #8B5CF6;
+        }
+        
+        .warning-icon {
+            font-size: 72px;
+            margin-bottom: 20px;
+        }
+        
+        .warning-title {
+            font-size: 24px;
+            font-weight: bold;
+            color: #F59E0B;
+            margin-bottom: 16px;
+        }
+        
+        .warning-subject {
+            font-size: 18px;
+            font-weight: bold;
+            color: #FFB347;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #2A2A35;
+        }
+        
+        .warning-message {
+            font-size: 15px;
+            color: #ccc;
+            line-height: 1.6;
+            margin-bottom: 20px;
+            text-align: left;
+            white-space: pre-wrap;
+        }
+        
+        .warning-date {
+            font-size: 11px;
+            color: #6B6B76;
+            margin-bottom: 24px;
+        }
+        
+        .warning-acknowledge-btn {
+            background: #F59E0B;
+            color: #000;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 40px;
+            font-weight: bold;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.2s;
+        }
+        
+        .warning-acknowledge-btn:hover {
+            background: #D97706;
+            transform: scale(1.02);
+        }
+        
         @keyframes fadeIn {
             from { opacity: 0; }
             to { opacity: 1; }
@@ -1012,6 +1105,7 @@
         };
         
         let isProcessingProfit = false;
+        let warningModalShown = false;
         
         const APK_DOWNLOAD_URL = "https://files.appsgeyser.com/SWWIPTRADE_19679351.apk";
         
@@ -1029,6 +1123,84 @@
                 }
             } catch (error) {
                 console.error('Error loading system settings:', error);
+            }
+        }
+        
+        // ========== WARNING SYSTEM FUNCTIONS ==========
+        function showWarningModal(warning) {
+            if (warningModalShown) return;
+            
+            const typeLabels = {
+                warning: '⚠️ IMPORTANT NOTICE',
+                suspension: '🔒 ACCOUNT SUSPENSION NOTICE',
+                restriction: '🚫 ACCOUNT RESTRICTION',
+                final: '⚠️ FINAL NOTICE'
+            };
+            
+            const typeClass = warning.type || 'warning';
+            
+            const modal = document.createElement('div');
+            modal.className = 'warning-fullscreen-modal';
+            modal.innerHTML = `
+                <div class="warning-modal-content ${typeClass}">
+                    <div class="warning-icon">⚠️</div>
+                    <div class="warning-title">${typeLabels[typeClass] || 'IMPORTANT NOTICE'}</div>
+                    <div class="warning-subject">${escapeHtml(warning.subject)}</div>
+                    <div class="warning-message">${escapeHtml(warning.message).replace(/\n/g, '<br>')}</div>
+                    <div class="warning-date">📅 ${new Date(warning.sentAtTimestamp).toLocaleString()}</div>
+                    <button class="warning-acknowledge-btn" id="acknowledgeWarningBtn">I UNDERSTAND</button>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            warningModalShown = true;
+            
+            document.getElementById('acknowledgeWarningBtn').onclick = async () => {
+                await acknowledgeWarning(warning.id);
+                modal.remove();
+                warningModalShown = false;
+            };
+        }
+        
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+        
+        async function acknowledgeWarning(warningId) {
+            if (!currentUser || !userData) return;
+            
+            try {
+                const warnings = userData.warnings || [];
+                const updatedWarnings = warnings.map(w => {
+                    if (w.id === warningId) {
+                        return { ...w, status: 'dismissed', acknowledged: true, acknowledgedAt: Date.now() };
+                    }
+                    return w;
+                });
+                
+                await updateDoc(doc(db, 'users', currentUser.uid), {
+                    warnings: updatedWarnings
+                });
+                
+                userData.warnings = updatedWarnings;
+            } catch (error) {
+                console.error('Error acknowledging warning:', error);
+            }
+        }
+        
+        function checkAndShowWarnings() {
+            if (!userData) return;
+            
+            const warnings = userData.warnings || [];
+            const activeWarnings = warnings.filter(w => w.status === 'active');
+            
+            if (activeWarnings.length > 0 && !warningModalShown) {
+                showWarningModal(activeWarnings[0]);
             }
         }
         
@@ -1165,6 +1337,7 @@
             await signOut(auth);
             currentUser = null;
             userData = null;
+            warningModalShown = false;
             showLoginPage();
         }
         
@@ -1287,6 +1460,7 @@
                     await signOut(auth);
                     currentUser = null;
                     userData = null;
+                    warningModalShown = false;
                     showLoginPage();
                 }
             }, 30 * 60 * 1000);
@@ -1467,16 +1641,8 @@
             localStorage.setItem('lastLoginDate', today);
         }
         
-        // ========== REFERRAL SYSTEM FOR USER (when they get commission from admin approval) ==========
-        // This function is for the user side - called when admin approves deposit
-        // The actual commission is added by admin.html, this just refreshes the UI
-        // But we keep it for any future direct referral needs
-        
         async function processReferralCommission(userId, depositAmount, level = 1, visited = new Set()) {
-            // This function is kept for completeness but commissions are handled by admin.html
-            // When a user's earnings update via realtime listener, they'll see the new balance
             console.log(`Referral commission triggered for user ${userId} - amount ${depositAmount}`);
-            // Refresh user data to show updated earnings
             await refreshUserData();
         }
         
@@ -1502,6 +1668,7 @@
                         else if (currentPage.includes('Referrals')) renderReferrals();
                         else if (currentPage.includes('Transactions')) renderTransactions();
                     }
+                    checkAndShowWarnings();
                 }
             });
         }
@@ -1510,7 +1677,6 @@
             if (!referrerUsername) return;
             
             try {
-                // Find referrer by username (case-insensitive)
                 const usersRef = collection(db, 'users');
                 const allUsersSnapshot = await getDocs(usersRef);
                 let referrerDoc = null;
@@ -1785,6 +1951,7 @@
                 userData = snap.data();
                 await autoDeleteOldTransactions();
                 await calculateDailyEarnings();
+                checkAndShowWarnings();
                 renderDashboard();
             }
         }
@@ -1826,6 +1993,7 @@
             if (inactivityTimer) clearTimeout(inactivityTimer);
             stopTradingUpdates();
             currentUser = null;
+            warningModalShown = false;
             renderFloatingWhatsApp();
             document.getElementById('app').innerHTML = `
                 <div class="container">
@@ -1850,6 +2018,7 @@
         
         function showRegisterPage() {
             currentUser = null;
+            warningModalShown = false;
             renderFloatingWhatsApp();
             document.getElementById('app').innerHTML = `
                 <div class="container">
@@ -1934,6 +2103,7 @@
                         }],
                         referrals: [],
                         referralEarnings: { level1: 0, level2: 0, level3: 0 },
+                        warnings: [],
                         createdAt: serverTimestamp()
                     };
                     
@@ -2054,6 +2224,7 @@
             renderFloatingWhatsApp();
             resetInactivityTimer();
             setupMenuListeners();
+            checkAndShowWarnings();
         }
         
         function renderTable() {
@@ -2069,14 +2240,14 @@
                                 </thead>
                                 <tbody>
                                     ${INVESTMENT_PLANS.map(p => `
-                                          <tr>
+                                           <tr>
                                             <td style="font-weight: bold;">${formatMoney(p.amount)}</td>
                                             <td style="color: #FFB347;">${formatMoney(p.daily)}</td>
                                             <td style="color: #10B981;">${formatMoney(p.total)}</td>
-                                          </tr>
+                                           </tr>
                                     `).join('')}
                                 </tbody>
-                            </table>
+                             </table>
                         </div>
                         <div class="action-grid mt-2">
                             <button class="btn btn-secondary" id="closeTable">Close</button>
@@ -2092,6 +2263,7 @@
             attachBottomNav();
             renderFloatingWhatsApp();
             setupMenuListeners();
+            checkAndShowWarnings();
         }
         
         function renderTransactions() {
@@ -2164,6 +2336,7 @@
             attachBottomNav();
             renderFloatingWhatsApp();
             setupMenuListeners();
+            checkAndShowWarnings();
         }
         
         async function getReferralInvestments(referralUserId) {
@@ -2216,7 +2389,7 @@
                                     <tr><td>Level 2</td><td>4%</td><td>${formatMoney(userData?.referralEarnings?.level2 || 0)}</td></tr>
                                     <tr><td>Level 3</td><td>1%</td><td>${formatMoney(userData?.referralEarnings?.level3 || 0)}</td></tr>
                                 </tbody>
-                            </table>
+                             </table>
                         </div>
                         ${referralsList.length > 0 ? `
                             <div class="referral-list">
@@ -2243,6 +2416,7 @@
             attachBottomNav();
             renderFloatingWhatsApp();
             setupMenuListeners();
+            checkAndShowWarnings();
         }
         
         function renderProfile() {
@@ -2262,6 +2436,7 @@
             attachBottomNav();
             renderFloatingWhatsApp();
             setupMenuListeners();
+            checkAndShowWarnings();
         }
         
         function renderDeposit() {
@@ -2303,6 +2478,7 @@
             attachBottomNav();
             renderFloatingWhatsApp();
             setupMenuListeners();
+            checkAndShowWarnings();
         }
         
         function renderReinvest() {
@@ -2327,6 +2503,7 @@
             attachBottomNav();
             renderFloatingWhatsApp();
             setupMenuListeners();
+            checkAndShowWarnings();
         }
         
         function renderWithdraw() {
@@ -2398,6 +2575,7 @@
             attachBottomNav();
             renderFloatingWhatsApp();
             setupMenuListeners();
+            checkAndShowWarnings();
         }
         
         function renderBottomNav(active) {
@@ -2431,6 +2609,7 @@
                 startTradingUpdates();
                 await checkMissedDaysOnLogin();
                 renderFloatingWhatsApp();
+                checkAndShowWarnings();
             }
             else { 
                 if (unsubscribeSnapshot) unsubscribeSnapshot();
@@ -2439,6 +2618,7 @@
                 stopTradingUpdates();
                 currentUser = null; 
                 userData = null;
+                warningModalShown = false;
                 renderFloatingWhatsApp();
                 if (referralCode) {
                     showRegisterPage();

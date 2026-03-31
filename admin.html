@@ -219,6 +219,11 @@
             color: #fff;
         }
 
+        .btn-warn {
+            background: #F59E0B;
+            color: #000;
+        }
+
         .switch {
             position: relative;
             display: inline-block;
@@ -349,6 +354,11 @@
             background: #0D0E14;
             color: #fff;
             font-size: 14px;
+        }
+
+        textarea {
+            min-height: 100px;
+            resize: vertical;
         }
 
         .settings-group {
@@ -550,6 +560,26 @@
             font-size: 11px;
             margin-top: 8px;
         }
+
+        .warnings-badge {
+            background: #F59E0B;
+            color: #000;
+            border-radius: 12px;
+            padding: 2px 6px;
+            font-size: 10px;
+            margin-left: 6px;
+        }
+
+        .warning-type {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: bold;
+        }
+        .warning-type-critical { background: #DC262620; color: #DC2626; }
+        .warning-type-warning { background: #F59E0B20; color: #F59E0B; }
+        .warning-type-info { background: #3B82F620; color: #3B82F6; }
     </style>
 </head>
 <body>
@@ -655,6 +685,74 @@
                         notificationPermission = permission === 'granted';
                     });
                 }
+            }
+        }
+        
+        // ========== WARNING SYSTEM FUNCTIONS ==========
+        async function sendWarningToUser(userId, warningData) {
+            try {
+                const userRef = doc(db, 'users', userId);
+                const userSnap = await getDoc(userRef);
+                
+                if (!userSnap.exists()) {
+                    showAlert('User not found!', 'error');
+                    return false;
+                }
+                
+                const warning = {
+                    id: Date.now().toString(),
+                    type: warningData.type,
+                    subject: warningData.subject,
+                    message: warningData.message,
+                    sentBy: 'admin',
+                    sentAt: serverTimestamp(),
+                    sentAtTimestamp: Date.now(),
+                    status: 'active',
+                    acknowledged: false,
+                    acknowledgedAt: null
+                };
+                
+                await updateDoc(userRef, {
+                    warnings: arrayUnion(warning)
+                });
+                
+                showAlert(`✅ Warning sent to ${warningData.username}`, 'success');
+                showBrowserNotification(
+                    '⚠️ Warning Sent!',
+                    `Warning sent to ${warningData.username}: ${warningData.subject}`,
+                    'https://swwiptrade.site/logo.png'
+                );
+                playNotificationSound();
+                return true;
+            } catch (error) {
+                console.error('Error sending warning:', error);
+                showAlert('Failed to send warning: ' + error.message, 'error');
+                return false;
+            }
+        }
+        
+        async function resolveWarning(userId, warningId) {
+            try {
+                const userRef = doc(db, 'users', userId);
+                const userSnap = await getDoc(userRef);
+                
+                if (userSnap.exists()) {
+                    const user = userSnap.data();
+                    const warnings = user.warnings || [];
+                    const updatedWarnings = warnings.map(w => {
+                        if (w.id === warningId) {
+                            return { ...w, status: 'resolved' };
+                        }
+                        return w;
+                    });
+                    
+                    await updateDoc(userRef, { warnings: updatedWarnings });
+                    showAlert('Warning marked as resolved', 'success');
+                    await refreshData();
+                }
+            } catch (error) {
+                console.error('Error resolving warning:', error);
+                showAlert('Failed to resolve warning', 'error');
             }
         }
         
@@ -848,16 +946,13 @@
             return `${typeCode}-${year}${month}${day}-${seq}`;
         }
         
-        // ========== COMPLETELY REWRITTEN REFERRAL SYSTEM ==========
-        // Case-insensitive, whitespace-trimmed, with detailed logging
-        
+        // ========== REFERRAL SYSTEM ==========
         async function findUserByUsername(username) {
             if (!username || username.trim() === '') return null;
             
             const trimmedUsername = username.trim();
             console.log(`🔍 Searching for user: "${trimmedUsername}"`);
             
-            // First try exact match
             const exactQuery = query(collection(db, 'users'), where("username", "==", trimmedUsername));
             const exactSnapshot = await getDocs(exactQuery);
             
@@ -867,7 +962,6 @@
                 return { id: doc.id, data: doc.data() };
             }
             
-            // If exact match fails, try case-insensitive search
             console.log(`⚠️ No exact match for "${trimmedUsername}", trying case-insensitive...`);
             const allUsersSnapshot = await getDocs(collection(db, 'users'));
             
@@ -897,7 +991,6 @@
             }
             
             try {
-                // Get depositor data
                 const depositorRef = doc(db, 'users', depositorId);
                 const depositorSnap = await getDoc(depositorRef);
                 
@@ -916,12 +1009,9 @@
                     return;
                 }
                 
-                // Trim whitespace from stored referrer username
                 referrerUsername = referrerUsername.trim();
                 console.log(`🔗 Referrer username from depositor: "${referrerUsername}"`);
                 
-                let currentReferrerId = null;
-                let currentReferrerData = null;
                 let level = 1;
                 let commissionRates = { 1: 0.10, 2: 0.04, 3: 0.01 };
                 let commissionsAdded = 0;
@@ -931,7 +1021,6 @@
                     visited.add(referrerUsername);
                     console.log(`\n--- LEVEL ${level} (${commissionRates[level]*100}%) ---`);
                     
-                    // Find the referrer by username
                     const referrerResult = await findUserByUsername(referrerUsername);
                     
                     if (!referrerResult) {
@@ -939,12 +1028,11 @@
                         break;
                     }
                     
-                    currentReferrerId = referrerResult.id;
-                    currentReferrerData = referrerResult.data;
+                    const currentReferrerId = referrerResult.id;
+                    const currentReferrerData = referrerResult.data;
                     
                     console.log(`✅ Found referrer: ${currentReferrerData.username} (ID: ${currentReferrerId})`);
                     
-                    // Calculate commission
                     const commissionAmount = depositAmount * commissionRates[level];
                     console.log(`💰 Commission to add: ${formatMoney(commissionAmount)}`);
                     
@@ -953,11 +1041,9 @@
                         break;
                     }
                     
-                    // Generate transaction ID
                     const transactionCount = (currentReferrerData.transactions || []).length;
                     const transactionId = generateTransactionId('referral', transactionCount + 1);
                     
-                    // Update referrer's data
                     await updateDoc(doc(db, 'users', currentReferrerId), {
                         earnings: increment(commissionAmount),
                         [`referralEarnings.level${level}`]: increment(commissionAmount),
@@ -976,16 +1062,6 @@
                     console.log(`✅ SUCCESS: Added ${formatMoney(commissionAmount)} to ${currentReferrerData.username}`);
                     commissionsAdded++;
                     
-                    // Show browser notification if admin is the referrer
-                    if (currentUser && currentUser.uid === currentReferrerId) {
-                        showBrowserNotification(
-                            '💰 Referral Commission!',
-                            `You earned ${formatMoney(commissionAmount)} from Level ${level} referral!`,
-                            'https://swwiptrade.site/logo.png'
-                        );
-                    }
-                    
-                    // Move to next level
                     referrerUsername = currentReferrerData.referredBy ? currentReferrerData.referredBy.trim() : null;
                     level++;
                 }
@@ -1066,7 +1142,6 @@
                 systemSettings.adminEarnings += adminCommission;
                 await saveSystemSettings();
                 
-                // Process referral commissions
                 console.log('🔄 Starting referral commission processing...');
                 await processReferralCommission(userId, amount);
                 
@@ -1328,6 +1403,80 @@
             );
         }
         
+        function showWarningModal(user) {
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.style.display = 'flex';
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <h3>⚠️ Send Warning to ${user.username}</h3>
+                    <div class="small-text" style="margin-bottom: 12px;">📱 Phone: ${user.phone || 'Not set'}</div>
+                    
+                    <div class="form-group">
+                        <label>Warning Type</label>
+                        <select id="warningType">
+                            <option value="warning">⚠️ Warning</option>
+                            <option value="suspension">🔒 Suspension Notice</option>
+                            <option value="restriction">🚫 Account Restriction</option>
+                            <option value="final">⚠️ Final Notice</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Subject</label>
+                        <input type="text" id="warningSubject" placeholder="e.g., Policy Violation Notice" value="Important Account Notice">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Message Body</label>
+                        <textarea id="warningMessage" placeholder="Enter your message here...">Dear ${user.username},
+
+Your account has been flagged for suspicious activity. Please contact support within 24 hours to resolve this issue.
+
+- SWWIPTRADE Support Team</textarea>
+                    </div>
+                    
+                    <div class="threshold-info" style="margin-top: 8px;">
+                        <div class="small-text">⚠️ This warning will appear as a full-screen modal to the user. They must click "I UNDERSTAND" to dismiss it. The warning will reappear on every auto-refresh until acknowledged.</div>
+                    </div>
+                    
+                    <div style="display: flex; gap: 10px; margin-top: 16px;">
+                        <button class="btn btn-warning" id="sendWarningBtn">⚠️ Send Warning</button>
+                        <button class="btn btn-secondary" id="cancelWarningBtn">Cancel</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            
+            document.getElementById('sendWarningBtn').onclick = async () => {
+                const type = document.getElementById('warningType').value;
+                const subject = document.getElementById('warningSubject').value.trim();
+                const message = document.getElementById('warningMessage').value.trim();
+                
+                if (!subject || !message) {
+                    showAlert('Please fill in both subject and message', 'error');
+                    return;
+                }
+                
+                const typeLabels = {
+                    warning: 'Warning',
+                    suspension: 'Suspension Notice',
+                    restriction: 'Account Restriction',
+                    final: 'Final Notice'
+                };
+                
+                await sendWarningToUser(user.uid, {
+                    username: user.username,
+                    type: type,
+                    subject: subject,
+                    message: message
+                });
+                modal.remove();
+            };
+            
+            document.getElementById('cancelWarningBtn').onclick = () => modal.remove();
+        }
+        
         function renderAdminPanel() {
             const totalDeposits = allUsers.reduce((sum, u) => sum + (u.deposits || 0), 0);
             const totalEarnings = allUsers.reduce((sum, u) => sum + (u.earnings || 0), 0);
@@ -1381,9 +1530,9 @@
                         <input type="text" id="searchDeposits" class="search-box" placeholder="🔍 Search by username, registered phone, deposit phone, or amount..." value="${depositSearchTerm}">
                         ${filteredDeposits.length === 0 ? '<div class="alert alert-success">No pending deposit requests</div>' : `
                             <div class="table-wrapper">
-                                 <table>
+                                <table>
                                     <thead>
-                                         <tr><th>User</th><th>Amount</th><th>User's Phone</th><th>Deposit Phone</th><th>Network</th><th>Admin Fee (${systemSettings.adminCommissionRate}%)</th><th>Total to Request</th><th>Date</th><th>Actions</th></tr>
+                                        <tr><th>User</th><th>Amount</th><th>User's Phone</th><th>Deposit Phone</th><th>Network</th><th>Admin Fee (${systemSettings.adminCommissionRate}%)</th><th>Total to Request</th><th>Date</th><th>Actions</th></tr>
                                     </thead>
                                     <tbody>
                                         ${filteredDeposits.map(d => {
@@ -1451,10 +1600,12 @@
                         <div class="table-wrapper">
                             <table>
                                 <thead>
-                                    <tr><th>Username</th><th>Phone</th><th>Deposits</th><th>Earnings</th><th>Withdraws</th><th>Referrals</th><th>Status</th><th>Actions</th></tr>
+                                    <tr><th>Username</th><th>Phone</th><th>Deposits</th><th>Earnings</th><th>Withdraws</th><th>Referrals</th><th>Warnings</th><th>Status</th><th>Actions</th></tr>
                                 </thead>
                                 <tbody id="usersTableBody">
-                                    ${allUsers.map(user => `
+                                    ${allUsers.map(user => {
+                                        const warningsCount = (user.warnings || []).filter(w => w.status === 'active').length;
+                                        return `
                                         <tr>
                                             <td><strong>${user.username}</strong></td>
                                             <td>${user.phone || 'N/A'}</td>
@@ -1462,15 +1613,17 @@
                                             <td>${formatMoney(user.earnings || 0)}</td>
                                             <td>${formatMoney(user.withdraws || 0)}</td>
                                             <td>${user.referrals?.length || 0}</td>
+                                            <td>${warningsCount > 0 ? `<span class="warnings-badge">⚠️ ${warningsCount}</span>` : '0'}</td>
                                             <td><span class="status-badge ${user.withdrawLocked ? 'status-locked' : 'status-active'}">${user.withdrawLocked ? '🔒 Locked' : '✅ Active'}</span></td>
                                             <td>
                                                 <button class="btn btn-primary" onclick="window.viewUserDetails('${user.uid}')">📋 View</button>
                                                 <button class="btn btn-warning" onclick="window.editUserModal('${user.uid}', '${user.username}', '${user.phone || ''}', ${user.deposits || 0}, ${user.earnings || 0}, ${user.withdrawLocked || false}, '${user.password || ''}')">✏️ Edit</button>
+                                                <button class="btn btn-warn" onclick="window.showWarningModal('${user.uid}', '${user.username}', '${user.phone || ''}')">⚠️ Warn</button>
                                                 <button class="btn ${user.withdrawLocked ? 'btn-success' : 'btn-warning'}" onclick="window.toggleWithdrawLock('${user.uid}', ${user.withdrawLocked || false})">${user.withdrawLocked ? '🔓 Unlock' : '🔒 Lock'}</button>
                                                 <button class="btn btn-danger" onclick="window.deleteUserAccount('${user.uid}', '${user.username}')">🗑️ Delete</button>
                                             </td>
                                         </tr>
-                                    `).join('')}
+                                    `}).join('')}
                                 </tbody>
                             </table>
                         </div>
@@ -1479,21 +1632,18 @@
                     <div id="settingsTab" style="display: ${currentTab === 'settings' ? 'block' : 'none'}">
                         <div class="settings-group">
                             <h3>💬 WhatsApp Settings</h3>
-                            
                             <div class="whatsapp-settings-row">
                                 <label>📱 Customer Care Chat Link (Floating Button)</label>
                                 <input type="text" id="whatsappChatLink" placeholder="https://wa.me/2567XXXXXXXX" value="${whatsappChatLink}">
                                 <div class="whatsapp-preview">💬 Preview: <a href="${whatsappChatLink || '#'}" target="_blank" id="chatPreviewLink">${whatsappChatLink || 'Not set'}</a></div>
                                 <div class="small-text">This link opens a direct chat with customer care (floating icon on user dashboard). Leave empty to hide the button.</div>
                             </div>
-                            
                             <div class="whatsapp-settings-row">
                                 <label>👥 WhatsApp Group Link (Join Group Button)</label>
                                 <input type="text" id="whatsappGroupLink" placeholder="https://chat.whatsapp.com/xxxxx" value="${whatsappGroupLink}">
                                 <div class="whatsapp-preview">💬 Preview: <a href="${whatsappGroupLink || '#'}" target="_blank" id="groupPreviewLink">${whatsappGroupLink || 'Not set'}</a></div>
                                 <div class="small-text">This link opens a WhatsApp group for users to join. Leave empty to hide the button.</div>
                             </div>
-                            
                             <button class="btn btn-primary" id="saveWhatsappLinksBtn">Save WhatsApp Links</button>
                             <button class="btn btn-success" id="testChatLinkBtn">📱 Test Chat Link</button>
                             <button class="btn btn-success" id="testGroupLinkBtn">👥 Test Group Link</button>
@@ -1565,7 +1715,6 @@
             `;
             
             document.getElementById('logoutBtn').onclick = () => adminLogout();
-            
             document.getElementById('downloadAppBtn')?.addEventListener('click', () => {
                 window.open(APK_DOWNLOAD_URL, '_blank');
             });
@@ -1717,7 +1866,9 @@
                     const filtered = allUsers.filter(u => u.username.toLowerCase().includes(searchTerm) || (u.phone && u.phone.includes(searchTerm)));
                     const tbody = document.getElementById('usersTableBody');
                     if (tbody) {
-                        tbody.innerHTML = filtered.map(user => `
+                        tbody.innerHTML = filtered.map(user => {
+                            const warningsCount = (user.warnings || []).filter(w => w.status === 'active').length;
+                            return `
                             <tr>
                                 <td><strong>${user.username}</strong></td>
                                 <td>${user.phone || 'N/A'}</td>
@@ -1725,15 +1876,17 @@
                                 <td>${formatMoney(user.earnings || 0)}</td>
                                 <td>${formatMoney(user.withdraws || 0)}</td>
                                 <td>${user.referrals?.length || 0}</td>
+                                <td>${warningsCount > 0 ? `<span class="warnings-badge">⚠️ ${warningsCount}</span>` : '0'}</td>
                                 <td><span class="status-badge ${user.withdrawLocked ? 'status-locked' : 'status-active'}">${user.withdrawLocked ? '🔒 Locked' : '✅ Active'}</span></td>
                                 <td>
                                     <button class="btn btn-primary" onclick="window.viewUserDetails('${user.uid}')">📋 View</button>
                                     <button class="btn btn-warning" onclick="window.editUserModal('${user.uid}', '${user.username}', '${user.phone || ''}', ${user.deposits || 0}, ${user.earnings || 0}, ${user.withdrawLocked || false}, '${user.password || ''}')">✏️ Edit</button>
+                                    <button class="btn btn-warn" onclick="window.showWarningModal('${user.uid}', '${user.username}', '${user.phone || ''}')">⚠️ Warn</button>
                                     <button class="btn ${user.withdrawLocked ? 'btn-success' : 'btn-warning'}" onclick="window.toggleWithdrawLock('${user.uid}', ${user.withdrawLocked || false})">${user.withdrawLocked ? '🔓 Unlock' : '🔒 Lock'}</button>
                                     <button class="btn btn-danger" onclick="window.deleteUserAccount('${user.uid}', '${user.username}')">🗑️ Delete</button>
                                 </td>
                             </tr>
-                        `).join('');
+                        `}).join('');
                     }
                 };
             }
@@ -1781,6 +1934,8 @@
             const referralsWithInvestment = await getUserReferralsWithInvestment(userId);
             const totalTeamInvestment = referralsWithInvestment.reduce((sum, ref) => sum + ref.invested, 0);
             const commission = totalTeamInvestment * 0.1;
+            const warnings = user.warnings || [];
+            const activeWarnings = warnings.filter(w => w.status === 'active');
             
             const modal = document.createElement('div');
             modal.className = 'modal';
@@ -1797,6 +1952,18 @@
                     <p><strong>Withdrawals:</strong> ${formatMoney(user.withdraws || 0)}</p>
                     <p><strong>Active Deposits:</strong> ${user.activeDeposits?.length || 0}</p>
                     <p><strong>Referrals Count:</strong> ${user.referrals?.length || 0}</p>
+                    ${activeWarnings.length > 0 ? `
+                        <p><strong>⚠️ Active Warnings (${activeWarnings.length}):</strong></p>
+                        <div class="referral-list-modal">
+                            ${activeWarnings.map(w => `
+                                <div class="referral-item-modal">
+                                    <span>📢 ${w.subject}</span>
+                                    <span class="small-text">${new Date(w.sentAtTimestamp).toLocaleDateString()}</span>
+                                    <button class="btn btn-sm btn-success" onclick="window.resolveWarning('${userId}', '${w.id}')">✅ Resolve</button>
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : '<p><strong>⚠️ Warnings:</strong> No active warnings</p>'}
                     ${referralsWithInvestment.length > 0 ? `
                         <p><strong>👥 Referrals List:</strong></p>
                         <div class="referral-list-modal">
@@ -1823,6 +1990,15 @@
             `;
             document.body.appendChild(modal);
             document.getElementById('closeModal').onclick = () => modal.remove();
+        };
+        
+        window.resolveWarning = async (userId, warningId) => {
+            await resolveWarning(userId, warningId);
+        };
+        
+        window.showWarningModal = (userId, username, phone) => {
+            const user = { uid: userId, username, phone };
+            showWarningModal(user);
         };
         
         window.editUserModal = async (userId, username, currentPhone, currentDeposits, currentEarnings, currentLock, currentPassword) => {
