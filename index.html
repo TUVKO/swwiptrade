@@ -1128,7 +1128,11 @@
         
         // ========== WARNING SYSTEM FUNCTIONS ==========
         function showWarningModal(warning) {
+            // Don't show if already showing or if warning is already dismissed/resolved
             if (warningModalShown) return;
+            
+            // Check if this warning is still active
+            if (warning.status !== 'active') return;
             
             const typeLabels = {
                 warning: '⚠️ IMPORTANT NOTICE',
@@ -1141,6 +1145,7 @@
             
             const modal = document.createElement('div');
             modal.className = 'warning-fullscreen-modal';
+            modal.id = 'activeWarningModal';
             modal.innerHTML = `
                 <div class="warning-modal-content ${typeClass}">
                     <div class="warning-icon">⚠️</div>
@@ -1158,6 +1163,11 @@
                 await acknowledgeWarning(warning.id);
                 modal.remove();
                 warningModalShown = false;
+                
+                // Check if there are more warnings after dismissing this one
+                setTimeout(() => {
+                    checkAndShowWarnings();
+                }, 500);
             };
         }
         
@@ -1188,6 +1198,7 @@
                 });
                 
                 userData.warnings = updatedWarnings;
+                console.log('Warning acknowledged and dismissed:', warningId);
             } catch (error) {
                 console.error('Error acknowledging warning:', error);
             }
@@ -1197,9 +1208,13 @@
             if (!userData) return;
             
             const warnings = userData.warnings || [];
+            // Only show warnings that are ACTIVE (status = 'active')
             const activeWarnings = warnings.filter(w => w.status === 'active');
             
+            console.log('Checking warnings:', activeWarnings.length, 'active warnings found');
+            
             if (activeWarnings.length > 0 && !warningModalShown) {
+                console.log('Showing warning modal for:', activeWarnings[0].subject);
                 showWarningModal(activeWarnings[0]);
             }
         }
@@ -1478,7 +1493,11 @@
             if (refreshTimer) clearInterval(refreshTimer);
             refreshTimer = setInterval(() => {
                 if (currentUser && document.visibilityState === 'visible') {
-                    location.reload();
+                    // Before reloading, check if there are active warnings
+                    // If modal is already showing, don't reload
+                    if (!warningModalShown) {
+                        location.reload();
+                    }
                 }
             }, 60 * 1000);
         }
@@ -1668,7 +1687,10 @@
                         else if (currentPage.includes('Referrals')) renderReferrals();
                         else if (currentPage.includes('Transactions')) renderTransactions();
                     }
-                    checkAndShowWarnings();
+                    // Check for warnings AFTER data updates
+                    setTimeout(() => {
+                        checkAndShowWarnings();
+                    }, 100);
                 }
             });
         }
@@ -1951,8 +1973,11 @@
                 userData = snap.data();
                 await autoDeleteOldTransactions();
                 await calculateDailyEarnings();
-                checkAndShowWarnings();
                 renderDashboard();
+                // Check warnings after dashboard renders
+                setTimeout(() => {
+                    checkAndShowWarnings();
+                }, 500);
             }
         }
         
@@ -2240,14 +2265,14 @@
                                 </thead>
                                 <tbody>
                                     ${INVESTMENT_PLANS.map(p => `
-                                           <tr>
-                                            <td style="font-weight: bold;">${formatMoney(p.amount)}</td>
-                                            <td style="color: #FFB347;">${formatMoney(p.daily)}</td>
-                                            <td style="color: #10B981;">${formatMoney(p.total)}</td>
-                                           </tr>
+                                            <tr>
+                                                <td style="font-weight: bold;">${formatMoney(p.amount)}</td>
+                                                <td style="color: #FFB347;">${formatMoney(p.daily)}</td>
+                                                <td style="color: #10B981;">${formatMoney(p.total)}</td>
+                                            </tr>
                                     `).join('')}
                                 </tbody>
-                             </table>
+                            </table>
                         </div>
                         <div class="action-grid mt-2">
                             <button class="btn btn-secondary" id="closeTable">Close</button>
@@ -2389,7 +2414,7 @@
                                     <tr><td>Level 2</td><td>4%</td><td>${formatMoney(userData?.referralEarnings?.level2 || 0)}</td></tr>
                                     <tr><td>Level 3</td><td>1%</td><td>${formatMoney(userData?.referralEarnings?.level3 || 0)}</td></tr>
                                 </tbody>
-                             </table>
+                            </table>
                         </div>
                         ${referralsList.length > 0 ? `
                             <div class="referral-list">
