@@ -688,7 +688,7 @@
             }
         }
         
-        // ========== WARNING SYSTEM FUNCTIONS ==========
+        // ========== WARNING SYSTEM FUNCTIONS (FIXED) ==========
         async function sendWarningToUser(userId, warningData) {
             try {
                 const userRef = doc(db, 'users', userId);
@@ -705,15 +705,17 @@
                     subject: warningData.subject,
                     message: warningData.message,
                     sentBy: 'admin',
-                    sentAt: serverTimestamp(),
+                    sentAt: new Date().toISOString(),
                     sentAtTimestamp: Date.now(),
                     status: 'active',
                     acknowledged: false,
                     acknowledgedAt: null
                 };
                 
+                const currentWarnings = userSnap.data().warnings || [];
+                
                 await updateDoc(userRef, {
-                    warnings: arrayUnion(warning)
+                    warnings: [...currentWarnings, warning]
                 });
                 
                 showAlert(`✅ Warning sent to ${warningData.username}`, 'success');
@@ -1458,13 +1460,6 @@ Your account has been flagged for suspicious activity. Please contact support wi
                     return;
                 }
                 
-                const typeLabels = {
-                    warning: 'Warning',
-                    suspension: 'Suspension Notice',
-                    restriction: 'Account Restriction',
-                    final: 'Final Notice'
-                };
-                
                 await sendWarningToUser(user.uid, {
                     username: user.username,
                     type: type,
@@ -1530,9 +1525,9 @@ Your account has been flagged for suspicious activity. Please contact support wi
                         <input type="text" id="searchDeposits" class="search-box" placeholder="🔍 Search by username, registered phone, deposit phone, or amount..." value="${depositSearchTerm}">
                         ${filteredDeposits.length === 0 ? '<div class="alert alert-success">No pending deposit requests</div>' : `
                             <div class="table-wrapper">
-                                <table>
+                                 <table>
                                     <thead>
-                                        <tr><th>User</th><th>Amount</th><th>User's Phone</th><th>Deposit Phone</th><th>Network</th><th>Admin Fee (${systemSettings.adminCommissionRate}%)</th><th>Total to Request</th><th>Date</th><th>Actions</th></tr>
+                                         <tr><th>User</th><th>Amount</th><th>User's Phone</th><th>Deposit Phone</th><th>Network</th><th>Admin Fee (${systemSettings.adminCommissionRate}%)</th><th>Total to Request</th><th>Date</th><th>Actions</th></tr>
                                     </thead>
                                     <tbody>
                                         ${filteredDeposits.map(d => {
@@ -1869,23 +1864,27 @@ Your account has been flagged for suspicious activity. Please contact support wi
                         tbody.innerHTML = filtered.map(user => {
                             const warningsCount = (user.warnings || []).filter(w => w.status === 'active').length;
                             return `
-                            <tr>
-                                <td><strong>${user.username}</strong></td>
-                                <td>${user.phone || 'N/A'}</td>
-                                <td>${formatMoney(user.deposits || 0)}</td>
-                                <td>${formatMoney(user.earnings || 0)}</td>
-                                <td>${formatMoney(user.withdraws || 0)}</td>
-                                <td>${user.referrals?.length || 0}</td>
-                                <td>${warningsCount > 0 ? `<span class="warnings-badge">⚠️ ${warningsCount}</span>` : '0'}</td>
-                                <td><span class="status-badge ${user.withdrawLocked ? 'status-locked' : 'status-active'}">${user.withdrawLocked ? '🔒 Locked' : '✅ Active'}</span></td>
-                                <td>
-                                    <button class="btn btn-primary" onclick="window.viewUserDetails('${user.uid}')">📋 View</button>
-                                    <button class="btn btn-warning" onclick="window.editUserModal('${user.uid}', '${user.username}', '${user.phone || ''}', ${user.deposits || 0}, ${user.earnings || 0}, ${user.withdrawLocked || false}, '${user.password || ''}')">✏️ Edit</button>
-                                    <button class="btn btn-warn" onclick="window.showWarningModal('${user.uid}', '${user.username}', '${user.phone || ''}')">⚠️ Warn</button>
-                                    <button class="btn ${user.withdrawLocked ? 'btn-success' : 'btn-warning'}" onclick="window.toggleWithdrawLock('${user.uid}', ${user.withdrawLocked || false})">${user.withdrawLocked ? '🔓 Unlock' : '🔒 Lock'}</button>
-                                    <button class="btn btn-danger" onclick="window.deleteUserAccount('${user.uid}', '${user.username}')">🗑️ Delete</button>
-                                </td>
-                            </tr>
+                            <table>
+                                <tbody>
+                                    <tr>
+                                        <td><strong>${user.username}</strong></td>
+                                        <td>${user.phone || 'N/A'}</td>
+                                        <td>${formatMoney(user.deposits || 0)}</td>
+                                        <td>${formatMoney(user.earnings || 0)}</td>
+                                        <td>${formatMoney(user.withdraws || 0)}</td>
+                                        <td>${user.referrals?.length || 0}</td>
+                                        <td>${warningsCount > 0 ? `<span class="warnings-badge">⚠️ ${warningsCount}</span>` : '0'}</td>
+                                        <td><span class="status-badge ${user.withdrawLocked ? 'status-locked' : 'status-active'}">${user.withdrawLocked ? '🔒 Locked' : '✅ Active'}</span></td>
+                                        <td>
+                                            <button class="btn btn-primary" onclick="window.viewUserDetails('${user.uid}')">📋 View</button>
+                                            <button class="btn btn-warning" onclick="window.editUserModal('${user.uid}', '${user.username}', '${user.phone || ''}', ${user.deposits || 0}, ${user.earnings || 0}, ${user.withdrawLocked || false}, '${user.password || ''}')">✏️ Edit</button>
+                                            <button class="btn btn-warn" onclick="window.showWarningModal('${user.uid}', '${user.username}', '${user.phone || ''}')">⚠️ Warn</button>
+                                            <button class="btn ${user.withdrawLocked ? 'btn-success' : 'btn-warning'}" onclick="window.toggleWithdrawLock('${user.uid}', ${user.withdrawLocked || false})">${user.withdrawLocked ? '🔓 Unlock' : '🔒 Lock'}</button>
+                                            <button class="btn btn-danger" onclick="window.deleteUserAccount('${user.uid}', '${user.username}')">🗑️ Delete</button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                             </table>
                         `}).join('');
                     }
                 };

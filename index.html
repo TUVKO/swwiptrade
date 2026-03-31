@@ -1128,10 +1128,7 @@
         
         // ========== WARNING SYSTEM FUNCTIONS ==========
         function showWarningModal(warning) {
-            // Don't show if already showing or if warning is already dismissed/resolved
             if (warningModalShown) return;
-            
-            // Check if this warning is still active
             if (warning.status !== 'active') return;
             
             const typeLabels = {
@@ -1163,8 +1160,6 @@
                 await acknowledgeWarning(warning.id);
                 modal.remove();
                 warningModalShown = false;
-                
-                // Check if there are more warnings after dismissing this one
                 setTimeout(() => {
                     checkAndShowWarnings();
                 }, 500);
@@ -1208,7 +1203,6 @@
             if (!userData) return;
             
             const warnings = userData.warnings || [];
-            // Only show warnings that are ACTIVE (status = 'active')
             const activeWarnings = warnings.filter(w => w.status === 'active');
             
             console.log('Checking warnings:', activeWarnings.length, 'active warnings found');
@@ -1493,8 +1487,6 @@
             if (refreshTimer) clearInterval(refreshTimer);
             refreshTimer = setInterval(() => {
                 if (currentUser && document.visibilityState === 'visible') {
-                    // Before reloading, check if there are active warnings
-                    // If modal is already showing, don't reload
                     if (!warningModalShown) {
                         location.reload();
                     }
@@ -1687,7 +1679,6 @@
                         else if (currentPage.includes('Referrals')) renderReferrals();
                         else if (currentPage.includes('Transactions')) renderTransactions();
                     }
-                    // Check for warnings AFTER data updates
                     setTimeout(() => {
                         checkAndShowWarnings();
                     }, 100);
@@ -1974,7 +1965,6 @@
                 await autoDeleteOldTransactions();
                 await calculateDailyEarnings();
                 renderDashboard();
-                // Check warnings after dashboard renders
                 setTimeout(() => {
                     checkAndShowWarnings();
                 }, 500);
@@ -2265,7 +2255,7 @@
                                 </thead>
                                 <tbody>
                                     ${INVESTMENT_PLANS.map(p => `
-                                            <tr>
+                                             technology
                                                 <td style="font-weight: bold;">${formatMoney(p.amount)}</td>
                                                 <td style="color: #FFB347;">${formatMoney(p.daily)}</td>
                                                 <td style="color: #10B981;">${formatMoney(p.total)}</td>
