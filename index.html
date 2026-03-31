@@ -1101,7 +1101,8 @@
         
         let systemSettings = {
             withdrawLocked: false,
-            appDownloadDisabled: false
+            appDownloadDisabled: false,
+            warningsEnabled: true
         };
         
         let isProcessingProfit = false;
@@ -1130,6 +1131,8 @@
         function showWarningModal(warning) {
             if (warningModalShown) return;
             if (warning.status !== 'active') return;
+            if (warning.stopShowing === true) return;
+            if (systemSettings.warningsEnabled === false) return;
             
             const typeLabels = {
                 warning: '⚠️ IMPORTANT NOTICE',
@@ -1160,6 +1163,7 @@
                 await acknowledgeWarning(warning.id);
                 modal.remove();
                 warningModalShown = false;
+                // Check for more warnings after dismissing
                 setTimeout(() => {
                     checkAndShowWarnings();
                 }, 500);
@@ -1183,7 +1187,7 @@
                 const warnings = userData.warnings || [];
                 const updatedWarnings = warnings.map(w => {
                     if (w.id === warningId) {
-                        return { ...w, status: 'dismissed', acknowledged: true, acknowledgedAt: Date.now() };
+                        return { ...w, acknowledged: true, acknowledgedAt: Date.now() };
                     }
                     return w;
                 });
@@ -1193,7 +1197,7 @@
                 });
                 
                 userData.warnings = updatedWarnings;
-                console.log('Warning acknowledged and dismissed:', warningId);
+                console.log('Warning acknowledged:', warningId);
             } catch (error) {
                 console.error('Error acknowledging warning:', error);
             }
@@ -1201,9 +1205,14 @@
         
         function checkAndShowWarnings() {
             if (!userData) return;
+            if (systemSettings.warningsEnabled === false) {
+                console.log('Warnings globally disabled');
+                return;
+            }
             
             const warnings = userData.warnings || [];
-            const activeWarnings = warnings.filter(w => w.status === 'active');
+            // Show warnings that are ACTIVE, NOT stopped, and (either not acknowledged OR we want to show again)
+            const activeWarnings = warnings.filter(w => w.status === 'active' && !w.stopShowing);
             
             console.log('Checking warnings:', activeWarnings.length, 'active warnings found');
             
@@ -1487,9 +1496,7 @@
             if (refreshTimer) clearInterval(refreshTimer);
             refreshTimer = setInterval(() => {
                 if (currentUser && document.visibilityState === 'visible') {
-                    if (!warningModalShown) {
-                        location.reload();
-                    }
+                    location.reload();
                 }
             }, 60 * 1000);
         }
@@ -1502,6 +1509,7 @@
                     const data = settingsSnap.data();
                     whatsappChatLink = data.whatsappChatLink || "";
                     whatsappGroupLink = data.whatsappGroupLink || "";
+                    if (data.warningsEnabled !== undefined) systemSettings.warningsEnabled = data.warningsEnabled;
                 }
             } catch (error) {
                 console.error('Error loading WhatsApp links:', error);
@@ -2255,7 +2263,7 @@
                                 </thead>
                                 <tbody>
                                     ${INVESTMENT_PLANS.map(p => `
-                                             technology
+                                            <tr>
                                                 <td style="font-weight: bold;">${formatMoney(p.amount)}</td>
                                                 <td style="color: #FFB347;">${formatMoney(p.daily)}</td>
                                                 <td style="color: #10B981;">${formatMoney(p.total)}</td>
