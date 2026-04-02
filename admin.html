@@ -683,7 +683,6 @@
                 const currentEarnings = user.earnings || 0;
                 const newEarnings = currentEarnings - deductAmount;
                 
-                // Add transaction record
                 const transactionId = `GOAJ-${Date.now()}`;
                 const transaction = {
                     id: Date.now(),
@@ -705,7 +704,6 @@
                     transactions: [transaction, ...currentTransactions]
                 });
                 
-                // Save to GOAJ history
                 const goajHistoryRef = doc(db, 'admin', 'goajHistory');
                 const historySnap = await getDoc(goajHistoryRef);
                 const existingHistory = historySnap.exists() ? historySnap.data().history || [] : [];
@@ -760,7 +758,6 @@
             
             const term = searchTerm.toLowerCase().trim();
             
-            // Search by username or phone
             const userFound = allUsers.find(u => 
                 u.username.toLowerCase() === term || 
                 u.username.toLowerCase().includes(term) ||
@@ -1112,8 +1109,103 @@
             return null;
         }
         
-        async function processReferralCommission(depositorId, depositAmount) {
-            console.log('Referral commission triggered for depositor:', depositorId);
+        // ========== FIXED REFERRAL COMMISSION FUNCTION ==========
+        async function processReferralCommission(depositorId, depositAmount, level = 1, visited = new Set()) {
+            // Stop at level 3
+            if (level > 3) return;
+            // Prevent infinite loops
+            if (visited.has(depositorId)) return;
+            visited.add(depositorId);
+            
+            try {
+                console.log(`[REFERRAL] Processing level ${level} for depositor ${depositorId}, amount: ${depositAmount}`);
+                
+                // Get the depositor's data
+                const depositorRef = doc(db, 'users', depositorId);
+                const depositorSnap = await getDoc(depositorRef);
+                
+                if (!depositorSnap.exists()) {
+                    console.log(`[REFERRAL] Depositor ${depositorId} not found`);
+                    return;
+                }
+                
+                const depositor = depositorSnap.data();
+                const referrerUsername = depositor.referredBy;
+                
+                // No referrer, stop
+                if (!referrerUsername) {
+                    console.log(`[REFERRAL] User ${depositor.username} has no referrer`);
+                    return;
+                }
+                
+                console.log(`[REFERRAL] Looking for referrer: ${referrerUsername}`);
+                
+                // Find the referrer by username
+                const usersRef = collection(db, 'users');
+                const q = query(usersRef, where("username", "==", referrerUsername));
+                const querySnap = await getDocs(q);
+                
+                if (querySnap.empty) {
+                    console.log(`[REFERRAL] Referrer ${referrerUsername} not found`);
+                    return;
+                }
+                
+                const referrerDoc = querySnap.docs[0];
+                const referrerId = referrerDoc.id;
+                const referrerData = referrerDoc.data();
+                
+                // Calculate commission based on level
+                let commissionRate = 0;
+                if (level === 1) commissionRate = 0.10;      // 10%
+                else if (level === 2) commissionRate = 0.04; // 4%
+                else if (level === 3) commissionRate = 0.01; // 1%
+                
+                const commission = depositAmount * commissionRate;
+                
+                if (commission <= 0) {
+                    console.log(`[REFERRAL] Commission is 0, skipping`);
+                    return;
+                }
+                
+                console.log(`[REFERRAL] Crediting ${commissionRate * 100}% commission: ${commission} UGX to ${referrerUsername}`);
+                
+                // Get current referral earnings
+                const currentLevelEarnings = referrerData.referralEarnings || { level1: 0, level2: 0, level3: 0 };
+                const updatedLevelEarnings = {
+                    level1: currentLevelEarnings.level1 + (level === 1 ? commission : 0),
+                    level2: currentLevelEarnings.level2 + (level === 2 ? commission : 0),
+                    level3: currentLevelEarnings.level3 + (level === 3 ? commission : 0)
+                };
+                
+                // Generate transaction ID
+                const transactionId = generateTransactionId('referral', (referrerData.transactions?.length || 0) + 1);
+                
+                // Update referrer's earnings
+                await updateDoc(doc(db, 'users', referrerId), {
+                    earnings: increment(commission),
+                    referralEarnings: updatedLevelEarnings,
+                    transactions: arrayUnion({
+                        id: Date.now(),
+                        transactionId: transactionId,
+                        type: 'referral',
+                        amount: commission,
+                        description: `${level === 1 ? 'Direct' : level === 2 ? '2nd Level' : '3rd Level'} referral commission (${commissionRate * 100}%) from deposit of ${formatMoney(depositAmount)} by ${depositor.username}`,
+                        fromUser: depositor.username,
+                        level: level,
+                        date: new Date().toISOString(),
+                        timestamp: Date.now(),
+                        status: 'completed'
+                    })
+                });
+                
+                console.log(`[REFERRAL] ✅ Successfully credited ${commission} UGX to ${referrerUsername} (Level ${level})`);
+                
+                // Continue up the chain for next level
+                await processReferralCommission(referrerId, depositAmount, level + 1, visited);
+                
+            } catch (error) {
+                console.error('[REFERRAL] Error processing referral commission:', error);
+            }
         }
         
         async function approveDeposit(requestId, userId, amount, phoneNumber, network) {
@@ -1175,6 +1267,7 @@
                 systemSettings.adminEarnings += adminCommission;
                 await saveSystemSettings();
                 
+                // Process referral commissions for all 3 levels
                 await processReferralCommission(userId, amount);
                 
                 await deleteDoc(doc(db, 'depositRequests', requestId));
@@ -1815,15 +1908,12 @@ Your account has been flagged for suspicious activity. Please contact support wi
                 </div>
             `;
             
-            // Logout button
             document.getElementById('logoutBtn').onclick = () => adminLogout();
             
-            // Download app button
             document.getElementById('downloadAppBtn')?.addEventListener('click', () => {
                 window.open(APK_DOWNLOAD_URL, '_blank');
             });
             
-            // Tab switching
             document.querySelectorAll('.tab-btn').forEach(btn => {
                 btn.onclick = () => { 
                     currentTab = btn.dataset.tab; 
@@ -1831,7 +1921,6 @@ Your account has been flagged for suspicious activity. Please contact support wi
                 };
             });
             
-            // Deposit actions
             document.querySelectorAll('#depositsTab .btn-success').forEach(btn => {
                 btn.onclick = async () => {
                     const requestId = btn.dataset.requestId;
@@ -1850,7 +1939,6 @@ Your account has been flagged for suspicious activity. Please contact support wi
                 };
             });
             
-            // Withdrawal actions
             document.querySelectorAll('#withdrawalsTab .btn-success').forEach(btn => {
                 btn.onclick = async () => {
                     const requestId = btn.dataset.requestId;
@@ -1875,7 +1963,6 @@ Your account has been flagged for suspicious activity. Please contact support wi
                 };
             });
             
-            // Settings toggles
             const globalWarningsToggle = document.getElementById('globalWarningsToggle');
             if (globalWarningsToggle) {
                 globalWarningsToggle.onchange = async (e) => {
@@ -1997,7 +2084,6 @@ Your account has been flagged for suspicious activity. Please contact support wi
                 };
             }
             
-            // User search and filtering
             const userSearch = document.getElementById('searchUsers');
             if (userSearch) {
                 userSearch.oninput = (e) => {
@@ -2030,7 +2116,6 @@ Your account has been flagged for suspicious activity. Please contact support wi
                 };
             }
             
-            // GOAJ TAB FUNCTIONS
             const goajSearchBtn = document.getElementById('goajSearchBtn');
             const goajSearchInput = document.getElementById('goajSearchInput');
             
@@ -2052,10 +2137,8 @@ Your account has been flagged for suspicious activity. Please contact support wi
                         
                         resultDiv.style.display = 'block';
                         
-                        // Store user data for deduction
                         window.selectedGoajUser = user;
                         
-                        // Preview on amount change
                         const deductInput = document.getElementById('goajDeductAmount');
                         const previewDeduct = document.getElementById('previewDeduct');
                         const previewNew = document.getElementById('previewNew');
@@ -2112,7 +2195,6 @@ Your account has been flagged for suspicious activity. Please contact support wi
                     if (confirmMsg) {
                         await deductFromUserEarnings(window.selectedGoajUser.uid, deductAmount, reason);
                         await refreshData();
-                        // Reset form
                         document.getElementById('goajSearchInput').value = '';
                         document.getElementById('goajUserResult').style.display = 'none';
                         document.getElementById('goajDeductAmount').value = '';
@@ -2122,7 +2204,6 @@ Your account has been flagged for suspicious activity. Please contact support wi
                 };
             }
             
-            // Deposit search
             const depositSearch = document.getElementById('searchDeposits');
             if (depositSearch) {
                 depositSearch.oninput = (e) => {
@@ -2131,7 +2212,6 @@ Your account has been flagged for suspicious activity. Please contact support wi
                 };
             }
             
-            // Withdrawal search
             const withdrawalSearch = document.getElementById('searchWithdrawals');
             if (withdrawalSearch) {
                 withdrawalSearch.oninput = (e) => {
@@ -2357,7 +2437,6 @@ Your account has been flagged for suspicious activity. Please contact support wi
                     return;
                 }
                 
-                // If earnings changed and reason provided, add transaction record
                 if (earnings !== currentEarnings && reason) {
                     const transactionId = `ADJ-${Date.now()}`;
                     const transaction = {

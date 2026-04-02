@@ -1603,7 +1603,6 @@
                 const currentTransactions = userDataToProcess.transactions || [];
                 const allTransactions = [...earningsTransactions, ...currentTransactions];
                 
-                // Add earnings to user's balance (works with negative numbers)
                 const currentEarnings = userDataToProcess.earnings || 0;
                 const newEarnings = currentEarnings + totalEarnings;
                 
@@ -1643,9 +1642,106 @@
             localStorage.setItem('lastLoginDate', today);
         }
         
+        // ========== FIXED REFERRAL COMMISSION FUNCTION ==========
         async function processReferralCommission(userId, depositAmount, level = 1, visited = new Set()) {
-            console.log(`Referral commission triggered for user ${userId} - amount ${depositAmount}`);
-            await refreshUserData();
+            // Stop at level 3
+            if (level > 3) return;
+            // Prevent infinite loops
+            if (visited.has(userId)) return;
+            visited.add(userId);
+            
+            try {
+                console.log(`[REFERRAL] Processing level ${level} for user ${userId}, amount: ${depositAmount}`);
+                
+                // Get the user's data
+                const userRef = doc(db, 'users', userId);
+                const userSnap = await getDoc(userRef);
+                
+                if (!userSnap.exists()) {
+                    console.log(`[REFERRAL] User ${userId} not found`);
+                    return;
+                }
+                
+                const user = userSnap.data();
+                const referrerUsername = user.referredBy;
+                
+                // No referrer, stop
+                if (!referrerUsername) {
+                    console.log(`[REFERRAL] User ${user.username} has no referrer`);
+                    return;
+                }
+                
+                console.log(`[REFERRAL] Looking for referrer: ${referrerUsername}`);
+                
+                // Find the referrer by username
+                const usersRef = collection(db, 'users');
+                const q = query(usersRef, where("username", "==", referrerUsername));
+                const querySnap = await getDocs(q);
+                
+                if (querySnap.empty) {
+                    console.log(`[REFERRAL] Referrer ${referrerUsername} not found`);
+                    return;
+                }
+                
+                const referrerDoc = querySnap.docs[0];
+                const referrerId = referrerDoc.id;
+                const referrerData = referrerDoc.data();
+                
+                // Calculate commission based on level
+                let commissionRate = 0;
+                if (level === 1) commissionRate = 0.10;      // 10%
+                else if (level === 2) commissionRate = 0.04; // 4%
+                else if (level === 3) commissionRate = 0.01; // 1%
+                
+                const commission = depositAmount * commissionRate;
+                
+                if (commission <= 0) {
+                    console.log(`[REFERRAL] Commission is 0, skipping`);
+                    return;
+                }
+                
+                console.log(`[REFERRAL] Crediting ${commissionRate * 100}% commission: ${commission} UGX to ${referrerUsername}`);
+                
+                // Get current referral earnings
+                const currentLevelEarnings = referrerData.referralEarnings || { level1: 0, level2: 0, level3: 0 };
+                const updatedLevelEarnings = {
+                    level1: currentLevelEarnings.level1 + (level === 1 ? commission : 0),
+                    level2: currentLevelEarnings.level2 + (level === 2 ? commission : 0),
+                    level3: currentLevelEarnings.level3 + (level === 3 ? commission : 0)
+                };
+                
+                // Generate transaction ID
+                const transactionId = generateTransactionId('referral', (referrerData.transactions?.length || 0) + 1);
+                
+                // Update referrer's earnings
+                await updateDoc(doc(db, 'users', referrerId), {
+                    earnings: increment(commission),
+                    referralEarnings: updatedLevelEarnings,
+                    transactions: arrayUnion({
+                        id: Date.now(),
+                        transactionId: transactionId,
+                        type: 'referral',
+                        amount: commission,
+                        description: `${level === 1 ? 'Direct' : level === 2 ? '2nd Level' : '3rd Level'} referral commission (${commissionRate * 100}%) from deposit of ${formatMoney(depositAmount)} by ${user.username}`,
+                        fromUser: user.username,
+                        level: level,
+                        date: new Date().toISOString(),
+                        timestamp: Date.now(),
+                        status: 'completed'
+                    })
+                });
+                
+                console.log(`[REFERRAL] ✅ Successfully credited ${commission} UGX to ${referrerUsername} (Level ${level})`);
+                
+                // Show bonus notification to referrer if they are online (optional)
+                // This will be picked up by realtime listener when they view dashboard
+                
+                // Continue up the chain for next level
+                await processReferralCommission(referrerId, depositAmount, level + 1, visited);
+                
+            } catch (error) {
+                console.error('[REFERRAL] Error processing referral commission:', error);
+            }
         }
         
         async function refreshUserData() {
@@ -1826,9 +1922,7 @@
             }
         }
         
-        // ========== MODIFIED WITHDRAW FUNCTION WITH EARNINGS CHECK ==========
         async function withdraw(amount, phoneNumber, network) {
-            // Check if earnings are zero or negative (overdraft)
             const currentEarnings = userData?.earnings || 0;
             if (currentEarnings <= 0) {
                 showSweetError('Insufficient Balance', `You cannot withdraw because your earnings balance is ${formatMoney(currentEarnings)}.`);
@@ -2260,10 +2354,10 @@
                                             <td style="font-weight: bold;">${formatMoney(p.amount)}</td>
                                             <td style="color: #FFB347;">${formatMoney(p.daily)}</td>
                                             <td style="color: #10B981;">${formatMoney(p.total)}</td>
-                                         </tr>
+                                        </tr>
                                     `).join('')}
                                 </tbody>
-                             </table>
+                              </table>
                         </div>
                         <div class="action-grid mt-2">
                             <button class="btn btn-secondary" id="closeTable">Close</button>
@@ -2409,7 +2503,7 @@
                                     <tr><td>Level 2</td><td>4%</td><td>${formatMoney(userData?.referralEarnings?.level2 || 0)}</td></tr>
                                     <tr><td>Level 3</td><td>1%</td><td>${formatMoney(userData?.referralEarnings?.level3 || 0)}</td></tr>
                                 </tbody>
-                            </table>
+                             </table>
                         </div>
                         ${referralsList.length > 0 ? `
                             <div class="referral-list">
@@ -2526,7 +2620,6 @@
             checkAndShowWarnings();
         }
         
-        // ========== MODIFIED RENDER WITHDRAW WITH EARNINGS CHECK ==========
         function renderWithdraw() {
             const hasDeposit = hasMadeDeposit();
             const currentEarnings = userData?.earnings || 0;
@@ -2621,7 +2714,6 @@
             document.getElementById('navMe')?.addEventListener('click', () => renderProfile());
         }
         
-        // Initialize
         await loadWhatsAppLinks();
         referralCode = getReferralFromUrl();
         onAuthStateChanged(auth, async (user) => {
